@@ -234,6 +234,15 @@
     background: var(--accent);
     color: #fff;
   }
+  .play-group-label {
+    width: 100%;
+    text-align: center;
+    font-size: .75rem;
+    font-weight: 700;
+    color: var(--sub);
+    letter-spacing: .08em;
+    margin-top: 6px;
+  }
   .transport {
     display: flex;
     flex-wrap: wrap;
@@ -738,9 +747,14 @@ select("pg");
 /* ================= フォーメーション再生 ================= */
 const HOOP = [250, 50];
 
+const UCLA_START = { pg:[250,385], sf:[100,270], c:[178,140] };
+const UCLA_ACTORS = ["pg","sf","c"];
+const UCLA_LABELS = { pg:"G", sf:"F", c:"C" };
+
 const PLAYS = [
   {
     id: "pickroll",
+    group: "基本プレー",
     name: "ピック&ロール",
     en: "Pick & Roll",
     purpose: "PGとC(センター)の2人で仕掛ける、バスケで最も多用される連携プレー。スクリーン（壁）でディフェンスの動きを止め、「PGのドライブ」と「Cのロール」の2択を守備に迫ります。",
@@ -757,6 +771,7 @@ const PLAYS = [
   },
   {
     id: "givego",
+    group: "基本プレー",
     name: "ギブ&ゴー",
     en: "Give & Go",
     purpose: "「パスして（ギブ）、走る（ゴー）」。最もシンプルで基本となる連携プレー。パスを出した直後、マークが緩んだ一瞬のスキを突いてゴールへ切り込みます。",
@@ -773,6 +788,7 @@ const PLAYS = [
   },
   {
     id: "kickout",
+    group: "基本プレー",
     name: "ドライブ&キックアウト",
     en: "Drive & Kick",
     purpose: "エースのドライブでディフェンスをゴール下に収縮させ、外で待つシューターへパスを展開して3ポイントを狙う、現代バスケの基本戦術です。",
@@ -785,6 +801,117 @@ const PLAYS = [
       { dur:1600, desc:"SFが中央へ力強くドライブ！守備全員がボールに引きつけられる", moves:{ sf:[298,150] } },
       { dur:1000, desc:"がら空きのコーナーで待つSGへキックアウトパス", pass:["sf","sg"] },
       { dur:1100, desc:"SGがコーナースリーを沈める！", shot:"sg" }
+    ]
+  },
+  {
+    id: "ucla1",
+    group: "UCLA+Zoom練習（G・F・Cの3人組）",
+    name: "① Gカッティング",
+    en: "G Cutting (UCLA Cut)",
+    purpose: "G・F・Cの3人で行うUCLAオフェンスの基本形。GがFへパスした後、Cのスクリーンを使ってゴールへ飛び込む「UCLAカット」で得点を狙います。",
+    tip: "カットの前に<strong>一歩逆側へ踏み込むフェイク</strong>を入れると、ディフェンスを置き去りにしやすくなります。",
+    actors: UCLA_ACTORS, labels: UCLA_LABELS,
+    start: UCLA_START,
+    ballStart: "pg",
+    segs: [
+      { dur:900,  desc:"GがウイングのFへパス", pass:["pg","sf"] },
+      { dur:1000, desc:"Cがエルボー（FTラインの角）へ上がりスクリーンをセット", moves:{ c:[188,212] } },
+      { dur:1500, desc:"GがCのスクリーンを使ってゴールへUCLAカット！", moves:{ pg:[233,95] } },
+      { dur:800,  desc:"FからカットしたGへパス", pass:["sf","pg"] },
+      { dur:900,  desc:"Gがレイアップ！", shot:"pg" }
+    ]
+  },
+  {
+    id: "ucla2",
+    group: "UCLA+Zoom練習（G・F・Cの3人組）",
+    name: "② Cダイブ",
+    en: "C Dive",
+    purpose: "UCLAカットで守備がGに引きつけられた瞬間、スクリーンをかけたC自身がゴールへダイブする第2の選択肢。Gへの警戒を逆手に取ります。",
+    tip: "Cは<strong>Gのカットが通過した直後</strong>にダイブするのがコツ。早すぎるとゴール下が渋滞してしまいます。",
+    actors: UCLA_ACTORS, labels: UCLA_LABELS,
+    start: UCLA_START,
+    ballStart: "pg",
+    segs: [
+      { dur:900,  desc:"GがウイングのFへパス", pass:["pg","sf"] },
+      { dur:1000, desc:"Cがエルボーへ上がりスクリーンをセット", moves:{ c:[188,212] } },
+      { dur:1500, desc:"GはUCLAカットからそのまま左コーナーへ抜ける", moves:{ pg:[60,70] } },
+      { dur:1200, desc:"入れ替わりでCがゴールへダイブ！", moves:{ c:[235,90] } },
+      { dur:800,  desc:"FからダイブしたCへパス", pass:["sf","c"] },
+      { dur:900,  desc:"Cがゴール下でフィニッシュ！", shot:"c" }
+    ]
+  },
+  {
+    id: "ucla3",
+    group: "UCLA+Zoom練習（G・F・Cの3人組）",
+    name: "③ Fバックドア",
+    en: "F Backdoor",
+    purpose: "Fへのパスコースを守備が前に出て塞いできたら、その裏（バックドア）を突いてFがゴールへ走り込むカウンタープレー。",
+    tip: "Fは<strong>一度ボールに近づいてから急反転</strong>するのがポイント。Gはバウンドパスで合わせるとカットされにくくなります。",
+    actors: UCLA_ACTORS, labels: UCLA_LABELS,
+    start: UCLA_START,
+    ballStart: "pg",
+    segs: [
+      { dur:900,  desc:"Fがパスを受けるふりをして外へ広がる", moves:{ sf:[78,248] } },
+      { dur:1300, desc:"守備が食いついた瞬間、Fが裏へバックドアカット！", moves:{ sf:[228,82] } },
+      { dur:800,  desc:"Gがバックドアパスを送る", pass:["pg","sf"] },
+      { dur:900,  desc:"Fがレイアップ！", shot:"sf" }
+    ]
+  },
+  {
+    id: "ucla4",
+    group: "UCLA+Zoom練習（G・F・Cの3人組）",
+    name: "④ Fドライブ",
+    en: "F Drive",
+    purpose: "Fがパスを受けて1on1を仕掛ける形。GとCは外へ広がって守備を引き連れ、Fがドライブで勝負できるスペースを作ります。",
+    tip: "周りの2人は<strong>ボールから離れて守備を引き連れる</strong>ことが仕事。空けたスペースがFの武器になります。",
+    actors: UCLA_ACTORS, labels: UCLA_LABELS,
+    start: UCLA_START,
+    ballStart: "pg",
+    segs: [
+      { dur:900,  desc:"GがウイングのFへパス", pass:["pg","sf"] },
+      { dur:1100, desc:"Cはトップへ上がり、Gと一緒に外へ広がってスペースを作る", moves:{ c:[238,332], pg:[255,388] } },
+      { dur:1500, desc:"Fがゴールへ力強くドライブ！", moves:{ sf:[228,85] } },
+      { dur:900,  desc:"Fがレイアップ！", shot:"sf" }
+    ]
+  },
+  {
+    id: "ucla5",
+    group: "UCLA+Zoom練習（G・F・Cの3人組）",
+    name: "⑤ UCLA→Fズーム",
+    en: "UCLA → F Down Screen + Handoff",
+    purpose: "UCLAカットから連続で「ズーム」アクション（ダウンスクリーン+ハンドオフ）へつなげる連続攻撃。Cのポップ、Fのダウンスクリーン、ハンドオフと守備を揺さぶり続けます。",
+    tip: "ハンドオフを受けるGは<strong>Cと肩が触れるくらいタイトに</strong>通るのがコツ。隙間があるとディフェンスに割り込まれます。",
+    actors: UCLA_ACTORS, labels: UCLA_LABELS,
+    start: UCLA_START,
+    ballStart: "pg",
+    segs: [
+      { dur:900,  desc:"GがウイングのFへパス", pass:["pg","sf"] },
+      { dur:1300, desc:"GがCのスクリーンを使ってUCLAカット", moves:{ pg:[220,110], c:[188,212] } },
+      { dur:1300, desc:"Gは左コーナーへ抜け、Cはトップへポップアウト", moves:{ pg:[60,70], c:[255,345] } },
+      { dur:800,  desc:"FからトップのCへリターンパス", pass:["sf","c"] },
+      { dur:1400, desc:"Fがコーナーへダウンスクリーン、Cがドリブルで寄る（ズーム）", moves:{ sf:[78,155], c:[160,290] } },
+      { dur:900,  desc:"スクリーンを使って上がったGへハンドオフ", pass:["c","pg"], moves:{ pg:[135,258] } },
+      { dur:1300, desc:"Gがそのまま中央へアタックしてジャンプシュート！", shot:"pg", moves:{ pg:[225,190] } }
+    ]
+  },
+  {
+    id: "ucla6",
+    group: "UCLA+Zoom練習（G・F・Cの3人組）",
+    name: "⑥ Cフラッシュ→Gズーム",
+    en: "C Flash → G Down Screen + Handoff",
+    purpose: "Cが高い位置へフラッシュしてボールを受け、GのダウンスクリーンからFへのハンドオフ（ズーム）で仕上げる形。⑤と役割を入れ替えて守備を惑わせます。",
+    tip: "Cはハンドオフの後<strong>そのままゴールへロール</strong>すると、Fのドライブに合わせる次の選択肢も生まれます。",
+    actors: UCLA_ACTORS, labels: UCLA_LABELS,
+    start: UCLA_START,
+    ballStart: "pg",
+    segs: [
+      { dur:1200, desc:"Cがトップへ勢いよくフラッシュ（駆け上がる）", moves:{ c:[215,330] } },
+      { dur:800,  desc:"GがフラッシュしたCへパス", pass:["pg","c"] },
+      { dur:1200, desc:"GがウイングのFへダウンスクリーンに向かう", moves:{ pg:[105,228] } },
+      { dur:1400, desc:"FはGのスクリーンを使って上がり、Cがドリブルで寄る（ズーム）", moves:{ sf:[122,252], c:[165,300] } },
+      { dur:900,  desc:"上がってきたFへハンドオフ", pass:["c","sf"], moves:{ sf:[142,268] } },
+      { dur:1300, desc:"Fが中央へアタック！GはウイングへCはゴール下へ", moves:{ sf:[238,192], pg:[70,180], c:[205,115] } },
+      { dur:1000, desc:"Fがジャンプシュートを沈める！", shot:"sf" }
     ]
   }
 ];
@@ -815,7 +942,7 @@ POSITIONS.forEach(pos => {
   label.textContent = pos.en.match(/\(([^)]+)\)/)[1];
   g.append(dot, label);
   playersG.appendChild(g);
-  playerEls[pos.id] = { dot, label };
+  playerEls[pos.id] = { g, dot, label, abbr: label.textContent };
 });
 const ballEl = document.createElementNS(svgNS, "circle");
 ballEl.setAttribute("r", 8);
@@ -848,9 +975,10 @@ const lerp = (a, b, t) => a + (b - a) * t;
 const lerpPt = (a, b, t) => [lerp(a[0], b[0], t), lerp(a[1], b[1], t)];
 const ease = t => t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
 const heldBallPos = p => [p[0] + 14, p[1] - 12];
+const getActors = () => curPlay.actors || Object.keys(playerEls);
 
 function setPositions(pos, ballPt) {
-  for (const id in playerEls) {
+  for (const id of getActors()) {
     playerEls[id].dot.setAttribute("cx", pos[id][0]);
     playerEls[id].dot.setAttribute("cy", pos[id][1]);
     playerEls[id].label.setAttribute("x", pos[id][0]);
@@ -876,6 +1004,12 @@ function resetPlay() {
   lastTs = null;
   basePos = JSON.parse(JSON.stringify(curPlay.start));
   ballHolder = curPlay.ballStart;
+  const actors = getActors();
+  for (const id in playerEls) {
+    playerEls[id].g.style.display = actors.includes(id) ? "" : "none";
+    playerEls[id].label.textContent =
+      (curPlay.labels && curPlay.labels[id]) || playerEls[id].abbr;
+  }
   setPositions(basePos, heldBallPos(basePos[ballHolder]));
   flashEl.classList.remove("goal-flash");
   updateSteps(-1);
@@ -894,7 +1028,7 @@ function frame(ts) {
   const e = ease(p);
 
   const cur = {};
-  for (const id in playerEls) {
+  for (const id of getActors()) {
     const from = basePos[id];
     const to = (seg.moves && seg.moves[id]) || from;
     cur[id] = lerpPt(from, to, e);
@@ -902,8 +1036,10 @@ function frame(ts) {
 
   let ballPt;
   if (seg.pass) {
-    const pt = lerpPt(cur[seg.pass[0]], cur[seg.pass[1]], e);
-    pt[1] -= 28 * Math.sin(Math.PI * e);
+    const a = cur[seg.pass[0]], b = cur[seg.pass[1]];
+    const pt = lerpPt(a, b, e);
+    const arcH = Math.min(30, Math.hypot(b[0] - a[0], b[1] - a[1]) * .12 + 5);
+    pt[1] -= arcH * Math.sin(Math.PI * e);
     ballPt = pt;
   } else if (seg.shot) {
     const pt = lerpPt(cur[seg.shot], HOOP, e);
@@ -915,7 +1051,7 @@ function frame(ts) {
   setPositions(cur, ballPt);
 
   if (p >= 1) {
-    for (const id in playerEls) {
+    for (const id of getActors()) {
       if (seg.moves && seg.moves[id]) basePos[id] = seg.moves[id].slice();
     }
     if (seg.pass) ballHolder = seg.pass[1];
@@ -967,7 +1103,15 @@ spdNorm.addEventListener("click", () => {
 });
 
 const playSelect = document.getElementById("playSelect");
+let lastGroup = null;
 PLAYS.forEach(play => {
+  if (play.group !== lastGroup) {
+    const label = document.createElement("div");
+    label.className = "play-group-label";
+    label.textContent = play.group;
+    playSelect.appendChild(label);
+    lastGroup = play.group;
+  }
   const btn = document.createElement("button");
   btn.textContent = play.name;
   btn.dataset.id = play.id;
