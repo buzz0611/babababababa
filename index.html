@@ -4,22 +4,55 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>バスケットボール ポジション解説</title>
+</head>
+<body>
 <style>
   :root {
     --bg: #f6f4ef;
     --card: #ffffff;
     --ink: #1f2430;
     --sub: #5b6270;
+    --chip: #f0eee8;
+    --bar-bg: #edeae2;
+    --tip-bg: #fdf3ec;
     --court: #e8b06d;
+    --court-paint: #d99a54;
     --court-line: #ffffff;
     --accent: #d95d39;
-    --pg: #e63946;
-    --sg: #f4a261;
-    --sf: #2a9d8f;
-    --pf: #457b9d;
-    --c:  #6d597a;
     --shadow: 0 6px 24px rgba(31,36,48,.10);
     --radius: 16px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1b1e25;
+      --card: #262a33;
+      --ink: #e8e9ec;
+      --sub: #9aa1ad;
+      --chip: #333844;
+      --bar-bg: #333844;
+      --tip-bg: #33291f;
+      --shadow: 0 6px 24px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #1b1e25;
+    --card: #262a33;
+    --ink: #e8e9ec;
+    --sub: #9aa1ad;
+    --chip: #333844;
+    --bar-bg: #333844;
+    --tip-bg: #33291f;
+    --shadow: 0 6px 24px rgba(0,0,0,.35);
+  }
+  :root[data-theme="light"] {
+    --bg: #f6f4ef;
+    --card: #ffffff;
+    --ink: #1f2430;
+    --sub: #5b6270;
+    --chip: #f0eee8;
+    --bar-bg: #edeae2;
+    --tip-bg: #fdf3ec;
+    --shadow: 0 6px 24px rgba(31,36,48,.10);
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -107,6 +140,10 @@
     0%   { opacity: .8; r: 20; }
     100% { opacity: 0;  r: 34; }
   }
+  @media (prefers-reduced-motion: reduce) {
+    .pos-marker.active circle.pulse { animation: none; }
+    .bar > span { transition: none !important; }
+  }
   .legend {
     display: flex;
     flex-wrap: wrap;
@@ -126,6 +163,11 @@
     transition: transform .12s ease, box-shadow .12s ease;
   }
   .legend button:hover { transform: translateY(-2px); }
+  .legend button:focus-visible,
+  .pos-marker:focus-visible {
+    outline: 3px solid var(--accent);
+    outline-offset: 2px;
+  }
   .legend button.active {
     box-shadow: 0 0 0 3px var(--bg), 0 0 0 5px currentColor;
   }
@@ -204,7 +246,7 @@
     font-size: .85rem;
   }
   .bar {
-    background: #edeae2;
+    background: var(--bar-bg);
     border-radius: 999px;
     height: 10px;
     overflow: hidden;
@@ -216,14 +258,19 @@
     width: 0;
     transition: width .5s ease;
   }
-  .stat-val { text-align: right; font-weight: 700; color: var(--sub); }
+  .stat-val {
+    text-align: right;
+    font-weight: 700;
+    color: var(--sub);
+    font-variant-numeric: tabular-nums;
+  }
   .players {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
   }
   .players span {
-    background: #f0eee8;
+    background: var(--chip);
     border-radius: 999px;
     padding: 5px 14px;
     font-size: .85rem;
@@ -231,7 +278,7 @@
   }
   .tip {
     margin-top: 18px;
-    background: #fdf3ec;
+    background: var(--tip-bg);
     border-left: 4px solid var(--accent);
     border-radius: 0 10px 10px 0;
     padding: 12px 14px;
@@ -246,8 +293,6 @@
     padding: 0 20px 40px;
   }
 </style>
-</head>
-<body>
 
 <header>
   <h1><span class="ball">🏀</span> バスケットボール ポジション解説</h1>
@@ -260,23 +305,14 @@
   <div class="court-panel">
     <h2>ハーフコートでの基本配置（オフェンス時の一例）</h2>
     <svg class="court" viewBox="0 0 500 470" role="img" aria-label="バスケットボールのハーフコート図">
-      <!-- コート面 -->
       <rect x="0" y="0" width="500" height="470" fill="var(--court)" rx="12"/>
-      <!-- 外枠 -->
       <rect x="15" y="15" width="470" height="440" fill="none" stroke="var(--court-line)" stroke-width="4"/>
-      <!-- ペイントエリア -->
-      <rect x="170" y="15" width="160" height="190" fill="#d99a54" stroke="var(--court-line)" stroke-width="4"/>
-      <!-- フリースローサークル -->
+      <rect x="170" y="15" width="160" height="190" fill="var(--court-paint)" stroke="var(--court-line)" stroke-width="4"/>
       <circle cx="250" cy="205" r="60" fill="none" stroke="var(--court-line)" stroke-width="4"/>
-      <!-- 3ポイントライン -->
       <path d="M 45 15 L 45 60 A 230 230 0 0 0 455 60 L 455 15" fill="none" stroke="var(--court-line)" stroke-width="4"/>
-      <!-- リング・バックボード -->
       <line x1="215" y1="30" x2="285" y2="30" stroke="var(--court-line)" stroke-width="5"/>
       <circle cx="250" cy="50" r="12" fill="none" stroke="#c1440e" stroke-width="4"/>
-      <!-- センターライン(下端の半円) -->
       <path d="M 190 455 A 60 60 0 0 1 310 455" fill="none" stroke="var(--court-line)" stroke-width="4"/>
-
-      <!-- ポジションマーカー(JSで生成) -->
       <g id="markers"></g>
     </svg>
     <div class="legend" id="legend"></div>
@@ -318,7 +354,6 @@ const POSITIONS = [
     number: "1番",
     name: "ポイントガード",
     en: "Point Guard (PG)",
-    color: "var(--pg)",
     colorHex: "#e63946",
     x: 250, y: 390,
     tagline: "コート上の司令塔",
@@ -344,7 +379,6 @@ const POSITIONS = [
     number: "2番",
     name: "シューティングガード",
     en: "Shooting Guard (SG)",
-    color: "var(--sg)",
     colorHex: "#f4a261",
     x: 105, y: 300,
     tagline: "チーム随一の得点源",
@@ -370,7 +404,6 @@ const POSITIONS = [
     number: "3番",
     name: "スモールフォワード",
     en: "Small Forward (SF)",
-    color: "var(--sf)",
     colorHex: "#2a9d8f",
     x: 395, y: 300,
     tagline: "攻守万能のオールラウンダー",
@@ -396,7 +429,6 @@ const POSITIONS = [
     number: "4番",
     name: "パワーフォワード",
     en: "Power Forward (PF)",
-    color: "var(--pf)",
     colorHex: "#457b9d",
     x: 140, y: 130,
     tagline: "ゴール下の力仕事人",
@@ -422,7 +454,6 @@ const POSITIONS = [
     number: "5番",
     name: "センター",
     en: "Center (C)",
-    color: "var(--c)",
     colorHex: "#6d597a",
     x: 320, y: 105,
     tagline: "ゴールを守る最後の砦",
@@ -450,7 +481,6 @@ const legend = document.getElementById("legend");
 const svgNS = "http://www.w3.org/2000/svg";
 
 POSITIONS.forEach(pos => {
-  // コート上マーカー
   const g = document.createElementNS(svgNS, "g");
   g.classList.add("pos-marker");
   g.dataset.id = pos.id;
@@ -484,7 +514,6 @@ POSITIONS.forEach(pos => {
   });
   markersG.appendChild(g);
 
-  // 凡例ボタン
   const btn = document.createElement("button");
   btn.textContent = pos.name;
   btn.style.background = pos.colorHex;
@@ -501,8 +530,7 @@ function select(id) {
   document.querySelectorAll(".pos-marker").forEach(m =>
     m.classList.toggle("active", m.dataset.id === id));
   document.querySelectorAll(".legend button").forEach(b => {
-    const active = b.dataset.id === id;
-    b.classList.toggle("active", active);
+    b.classList.toggle("active", b.dataset.id === id);
   });
 
   document.getElementById("detailHeader").style.backgroundColor = pos.colorHex;
@@ -521,7 +549,6 @@ function select(id) {
       <div class="bar"><span style="background:${pos.colorHex}"></span></div>
       <div class="stat-val">${val}</div>
     </div>`).join("");
-  // バーのアニメーション
   requestAnimationFrame(() => {
     document.querySelectorAll("#dStats .bar > span").forEach((span, i) => {
       span.style.width = pos.stats[i][1] + "%";
@@ -535,5 +562,6 @@ function select(id) {
 
 select("pg");
 </script>
+
 </body>
 </html>
