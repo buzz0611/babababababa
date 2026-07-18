@@ -172,6 +172,147 @@
     box-shadow: 0 0 0 3px var(--bg), 0 0 0 5px currentColor;
   }
 
+  /* ---- モード切替 ---- */
+  .mode-tabs {
+    display: flex;
+    justify-content: center;
+    gap: 4px;
+    margin: 4px auto 0;
+    background: var(--card);
+    border-radius: 999px;
+    padding: 6px;
+    width: fit-content;
+    box-shadow: var(--shadow);
+  }
+  .mode-tabs button {
+    border: none;
+    border-radius: 999px;
+    padding: 8px 22px;
+    font-size: .9rem;
+    font-weight: 700;
+    font-family: inherit;
+    background: transparent;
+    color: var(--sub);
+    cursor: pointer;
+    transition: background-color .15s ease, color .15s ease;
+  }
+  .mode-tabs button.active {
+    background: var(--accent);
+    color: #fff;
+  }
+  .mode-tabs button:focus-visible {
+    outline: 3px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  /* ---- フォーメーション再生 ---- */
+  .play-select {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 14px;
+  }
+  .play-select button {
+    border: 2px solid var(--accent);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--accent);
+    padding: 6px 14px;
+    font-size: .85rem;
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+    transition: transform .12s ease;
+  }
+  .play-select button:hover { transform: translateY(-2px); }
+  .play-select button:focus-visible {
+    outline: 3px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .play-select button.active {
+    background: var(--accent);
+    color: #fff;
+  }
+  .transport {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+  }
+  .transport button {
+    border: none;
+    border-radius: 10px;
+    padding: 8px 18px;
+    font-size: .9rem;
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+    background: var(--chip);
+    color: var(--ink);
+  }
+  .transport button:focus-visible {
+    outline: 3px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .transport button.primary {
+    background: var(--accent);
+    color: #fff;
+    min-width: 8.5em;
+  }
+  .transport .speed { display: flex; gap: 4px; }
+  .transport .speed button { font-size: .8rem; padding: 8px 12px; }
+  .transport .speed button.active {
+    box-shadow: inset 0 0 0 2px var(--accent);
+    color: var(--accent);
+  }
+  .steps {
+    list-style: none;
+    counter-reset: step;
+    margin-bottom: 4px;
+  }
+  .steps li {
+    counter-increment: step;
+    position: relative;
+    padding: 8px 10px 8px 42px;
+    border-radius: 10px;
+    font-size: .92rem;
+    color: var(--sub);
+    margin-bottom: 4px;
+    transition: background-color .2s ease;
+  }
+  .steps li::before {
+    content: counter(step);
+    position: absolute;
+    left: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--chip);
+    color: var(--sub);
+    font-weight: 700;
+    font-size: .8rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .steps li.current {
+    background: var(--tip-bg);
+    color: var(--ink);
+    font-weight: 600;
+  }
+  .steps li.current::before { background: var(--accent); color: #fff; }
+  .steps li.done { opacity: .55; }
+  .goal-flash { animation: goalflash .8s ease-out; }
+  @keyframes goalflash {
+    0%   { opacity: 1; r: 14; }
+    100% { opacity: 0; r: 46; }
+  }
+
   /* ---- 解説カード ---- */
   .detail {
     background: var(--card);
@@ -299,11 +440,16 @@
   <p>コート上のマーカー、またはボタンをタップして各ポジションの役割を見てみよう</p>
 </header>
 
+<nav class="mode-tabs" aria-label="表示モード">
+  <button id="tabPositions" class="active">ポジション解説</button>
+  <button id="tabPlays">フォーメーション</button>
+</nav>
+
 <div class="container">
 
   <!-- コート -->
   <div class="court-panel">
-    <h2>ハーフコートでの基本配置（オフェンス時の一例）</h2>
+    <h2 id="courtTitle">ハーフコートでの基本配置（オフェンス時の一例）</h2>
     <svg class="court" viewBox="0 0 500 470" role="img" aria-label="バスケットボールのハーフコート図">
       <rect x="0" y="0" width="500" height="470" fill="var(--court)" rx="12"/>
       <rect x="15" y="15" width="470" height="440" fill="none" stroke="var(--court-line)" stroke-width="4"/>
@@ -314,8 +460,20 @@
       <circle cx="250" cy="50" r="12" fill="none" stroke="#c1440e" stroke-width="4"/>
       <path d="M 190 455 A 60 60 0 0 1 310 455" fill="none" stroke="var(--court-line)" stroke-width="4"/>
       <g id="markers"></g>
+      <g id="playersG" style="display:none"></g>
     </svg>
     <div class="legend" id="legend"></div>
+    <div id="playControls" hidden>
+      <div class="play-select" id="playSelect"></div>
+      <div class="transport">
+        <button class="primary" id="btnPlay">▶ 再生</button>
+        <button id="btnReset">↺ リセット</button>
+        <div class="speed" role="group" aria-label="再生速度">
+          <button id="spdSlow">ゆっくり</button>
+          <button id="spdNorm" class="active">ふつう</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- 解説 -->
@@ -339,6 +497,21 @@
       <div class="players" id="dPlayers"></div>
 
       <div class="tip" id="dTip"></div>
+    </div>
+  </div>
+
+  <!-- フォーメーション解説 -->
+  <div class="detail" id="formationDetail" hidden>
+    <div class="detail-header" style="background: var(--accent)">
+      <div class="number">フォーメーション</div>
+      <h2 id="fName"></h2>
+      <div class="en" id="fEn"></div>
+    </div>
+    <div class="detail-body">
+      <p class="desc" id="fPurpose"></p>
+      <div class="section-title">プレーの流れ</div>
+      <ol class="steps" id="fSteps"></ol>
+      <div class="tip" id="fTip"></div>
     </div>
   </div>
 </div>
@@ -561,6 +734,286 @@ function select(id) {
 }
 
 select("pg");
+
+/* ================= フォーメーション再生 ================= */
+const HOOP = [250, 50];
+
+const PLAYS = [
+  {
+    id: "pickroll",
+    name: "ピック&ロール",
+    en: "Pick & Roll",
+    purpose: "PGとC(センター)の2人で仕掛ける、バスケで最も多用される連携プレー。スクリーン（壁）でディフェンスの動きを止め、「PGのドライブ」と「Cのロール」の2択を守備に迫ります。",
+    tip: "守備は「PGに2人つくか、ロールするCを追うか」の選択を迫られます。<strong>どちらを選んでも誰かがノーマークになる</strong>のがこのプレーの強みです。",
+    start: { pg:[250,390], sg:[80,260], sf:[420,260], pf:[110,120], c:[320,105] },
+    ballStart: "pg",
+    segs: [
+      { dur:1500, desc:"CがPGのディフェンダーの進路をふさぐ位置へ上がり、スクリーンをセット", moves:{ c:[292,332] } },
+      { dur:1800, desc:"PGがスクリーンを使って中央へドライブ。守備2人がPGに引きつけられる", moves:{ pg:[292,205] } },
+      { dur:1400, desc:"Cがゴールへ向かって一気にロール（ダイブ）", moves:{ c:[268,115], pg:[282,195] } },
+      { dur:900,  desc:"PGからロールしたCへラストパス", pass:["pg","c"], moves:{ c:[258,92] } },
+      { dur:900,  desc:"Cがゴール下でフィニッシュ！", shot:"c" }
+    ]
+  },
+  {
+    id: "givego",
+    name: "ギブ&ゴー",
+    en: "Give & Go",
+    purpose: "「パスして（ギブ）、走る（ゴー）」。最もシンプルで基本となる連携プレー。パスを出した直後、マークが緩んだ一瞬のスキを突いてゴールへ切り込みます。",
+    tip: "成功のカギは<strong>パス直後の緩急</strong>。一度歩いて油断させてから一気に加速すると、ディフェンスを置き去りにできます。",
+    start: { pg:[250,390], sg:[80,260], sf:[400,270], pf:[110,120], c:[430,95] },
+    ballStart: "pg",
+    segs: [
+      { dur:900,  desc:"PGがウイングのSFへパス（ギブ）", pass:["pg","sf"] },
+      { dur:800,  desc:"PGは何気なく歩き出し、ディフェンスの油断を誘う", moves:{ pg:[232,362] } },
+      { dur:1400, desc:"急加速してゴールへ一直線にカット（ゴー）！", moves:{ pg:[262,135] } },
+      { dur:800,  desc:"SFから走り込んだPGへリターンパス", pass:["sf","pg"], moves:{ pg:[255,100] } },
+      { dur:900,  desc:"PGがそのままレイアップ！", shot:"pg" }
+    ]
+  },
+  {
+    id: "kickout",
+    name: "ドライブ&キックアウト",
+    en: "Drive & Kick",
+    purpose: "エースのドライブでディフェンスをゴール下に収縮させ、外で待つシューターへパスを展開して3ポイントを狙う、現代バスケの基本戦術です。",
+    tip: "シューターは<strong>ドライブが始まる前にコーナーで構えておく</strong>ことが大切。キャッチしてすぐ打てる準備が成功率を左右します。",
+    start: { pg:[250,390], sg:[105,300], sf:[395,300], pf:[120,140], c:[320,105] },
+    ballStart: "pg",
+    segs: [
+      { dur:900,  desc:"PGがエースのSFへパス", pass:["pg","sf"] },
+      { dur:1100, desc:"SGは左コーナーへ移動、PFとCはゴール下からスペースを空ける", moves:{ sg:[58,75], pf:[92,225], c:[425,80] } },
+      { dur:1600, desc:"SFが中央へ力強くドライブ！守備全員がボールに引きつけられる", moves:{ sf:[298,150] } },
+      { dur:1000, desc:"がら空きのコーナーで待つSGへキックアウトパス", pass:["sf","sg"] },
+      { dur:1100, desc:"SGがコーナースリーを沈める！", shot:"sg" }
+    ]
+  }
+];
+
+const playersG = document.getElementById("playersG");
+const courtTitle = document.getElementById("courtTitle");
+const playControls = document.getElementById("playControls");
+const btnPlay = document.getElementById("btnPlay");
+const btnReset = document.getElementById("btnReset");
+const spdSlow = document.getElementById("spdSlow");
+const spdNorm = document.getElementById("spdNorm");
+const COURT_TITLE_DEFAULT = "ハーフコートでの基本配置（オフェンス時の一例）";
+
+const playerEls = {};
+POSITIONS.forEach(pos => {
+  const g = document.createElementNS(svgNS, "g");
+  const dot = document.createElementNS(svgNS, "circle");
+  dot.setAttribute("r", 18);
+  dot.setAttribute("fill", pos.colorHex);
+  dot.setAttribute("stroke", "#fff");
+  dot.setAttribute("stroke-width", 3);
+  const label = document.createElementNS(svgNS, "text");
+  label.setAttribute("fill", "#fff");
+  label.setAttribute("font-weight", "700");
+  label.setAttribute("font-size", "13");
+  label.setAttribute("text-anchor", "middle");
+  label.setAttribute("dominant-baseline", "central");
+  label.textContent = pos.en.match(/\(([^)]+)\)/)[1];
+  g.append(dot, label);
+  playersG.appendChild(g);
+  playerEls[pos.id] = { dot, label };
+});
+const ballEl = document.createElementNS(svgNS, "circle");
+ballEl.setAttribute("r", 8);
+ballEl.setAttribute("fill", "#e8702a");
+ballEl.setAttribute("stroke", "#8a4b17");
+ballEl.setAttribute("stroke-width", 2);
+playersG.appendChild(ballEl);
+const flashEl = document.createElementNS(svgNS, "circle");
+flashEl.setAttribute("cx", HOOP[0]);
+flashEl.setAttribute("cy", HOOP[1]);
+flashEl.setAttribute("r", 14);
+flashEl.setAttribute("fill", "none");
+flashEl.setAttribute("stroke", "#ffd166");
+flashEl.setAttribute("stroke-width", 5);
+flashEl.setAttribute("opacity", 0);
+playersG.appendChild(flashEl);
+
+let curPlay = PLAYS[0];
+let basePos = {};
+let ballHolder = null;
+let segIdx = 0;
+let segElapsed = 0;
+let running = false;
+let finished = false;
+let lastTs = null;
+let speed = 1;
+let rafId = null;
+
+const lerp = (a, b, t) => a + (b - a) * t;
+const lerpPt = (a, b, t) => [lerp(a[0], b[0], t), lerp(a[1], b[1], t)];
+const ease = t => t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+const heldBallPos = p => [p[0] + 14, p[1] - 12];
+
+function setPositions(pos, ballPt) {
+  for (const id in playerEls) {
+    playerEls[id].dot.setAttribute("cx", pos[id][0]);
+    playerEls[id].dot.setAttribute("cy", pos[id][1]);
+    playerEls[id].label.setAttribute("x", pos[id][0]);
+    playerEls[id].label.setAttribute("y", pos[id][1]);
+  }
+  ballEl.setAttribute("cx", ballPt[0]);
+  ballEl.setAttribute("cy", ballPt[1]);
+}
+
+function updateSteps(idx) {
+  document.querySelectorAll("#fSteps li").forEach((li, i) => {
+    li.classList.toggle("current", i === idx);
+    li.classList.toggle("done", i < idx);
+  });
+}
+
+function resetPlay() {
+  cancelAnimationFrame(rafId);
+  running = false;
+  finished = false;
+  segIdx = 0;
+  segElapsed = 0;
+  lastTs = null;
+  basePos = JSON.parse(JSON.stringify(curPlay.start));
+  ballHolder = curPlay.ballStart;
+  setPositions(basePos, heldBallPos(basePos[ballHolder]));
+  flashEl.classList.remove("goal-flash");
+  updateSteps(-1);
+  btnPlay.textContent = "▶ 再生";
+  courtTitle.textContent = curPlay.name + " — 再生ボタンでスタート";
+}
+
+function frame(ts) {
+  if (!running) return;
+  if (lastTs === null) lastTs = ts;
+  segElapsed += (ts - lastTs) * speed;
+  lastTs = ts;
+
+  const seg = curPlay.segs[segIdx];
+  const p = Math.min(1, segElapsed / seg.dur);
+  const e = ease(p);
+
+  const cur = {};
+  for (const id in playerEls) {
+    const from = basePos[id];
+    const to = (seg.moves && seg.moves[id]) || from;
+    cur[id] = lerpPt(from, to, e);
+  }
+
+  let ballPt;
+  if (seg.pass) {
+    const pt = lerpPt(cur[seg.pass[0]], cur[seg.pass[1]], e);
+    pt[1] -= 28 * Math.sin(Math.PI * e);
+    ballPt = pt;
+  } else if (seg.shot) {
+    const pt = lerpPt(cur[seg.shot], HOOP, e);
+    pt[1] -= 55 * Math.sin(Math.PI * e);
+    ballPt = pt;
+  } else {
+    ballPt = heldBallPos(cur[ballHolder]);
+  }
+  setPositions(cur, ballPt);
+
+  if (p >= 1) {
+    for (const id in playerEls) {
+      if (seg.moves && seg.moves[id]) basePos[id] = seg.moves[id].slice();
+    }
+    if (seg.pass) ballHolder = seg.pass[1];
+    if (seg.shot) {
+      flashEl.classList.remove("goal-flash");
+      void flashEl.getBoundingClientRect();
+      flashEl.classList.add("goal-flash");
+    }
+    segIdx++;
+    segElapsed = 0;
+    if (segIdx >= curPlay.segs.length) {
+      running = false;
+      finished = true;
+      btnPlay.textContent = "↺ もう一度";
+      updateSteps(curPlay.segs.length);
+      courtTitle.textContent = curPlay.name + " — ナイスプレー！🎉";
+      return;
+    }
+    updateSteps(segIdx);
+    courtTitle.textContent = curPlay.segs[segIdx].desc;
+  }
+  rafId = requestAnimationFrame(frame);
+}
+
+btnPlay.addEventListener("click", () => {
+  if (finished) resetPlay();
+  if (running) {
+    running = false;
+    btnPlay.textContent = "▶ 再生";
+  } else {
+    running = true;
+    lastTs = null;
+    btnPlay.textContent = "⏸ 一時停止";
+    updateSteps(segIdx);
+    courtTitle.textContent = curPlay.segs[segIdx].desc;
+    rafId = requestAnimationFrame(frame);
+  }
+});
+btnReset.addEventListener("click", resetPlay);
+spdSlow.addEventListener("click", () => {
+  speed = .55;
+  spdSlow.classList.add("active");
+  spdNorm.classList.remove("active");
+});
+spdNorm.addEventListener("click", () => {
+  speed = 1;
+  spdNorm.classList.add("active");
+  spdSlow.classList.remove("active");
+});
+
+const playSelect = document.getElementById("playSelect");
+PLAYS.forEach(play => {
+  const btn = document.createElement("button");
+  btn.textContent = play.name;
+  btn.dataset.id = play.id;
+  btn.addEventListener("click", () => selectPlay(play.id));
+  playSelect.appendChild(btn);
+});
+
+function selectPlay(id) {
+  curPlay = PLAYS.find(p => p.id === id);
+  document.querySelectorAll("#playSelect button").forEach(b =>
+    b.classList.toggle("active", b.dataset.id === id));
+  document.getElementById("fName").textContent = curPlay.name;
+  document.getElementById("fEn").textContent = curPlay.en;
+  document.getElementById("fPurpose").textContent = curPlay.purpose;
+  document.getElementById("fTip").innerHTML = "💡 " + curPlay.tip;
+  document.getElementById("fSteps").innerHTML =
+    curPlay.segs.map(s => `<li>${s.desc}</li>`).join("");
+  resetPlay();
+}
+
+const tabPositions = document.getElementById("tabPositions");
+const tabPlays = document.getElementById("tabPlays");
+
+function setMode(mode) {
+  const isPos = mode === "positions";
+  tabPositions.classList.toggle("active", isPos);
+  tabPlays.classList.toggle("active", !isPos);
+  markersG.style.display = isPos ? "" : "none";
+  legend.style.display = isPos ? "" : "none";
+  playersG.style.display = isPos ? "none" : "";
+  playControls.hidden = isPos;
+  document.getElementById("detail").hidden = !isPos;
+  document.getElementById("formationDetail").hidden = isPos;
+  if (isPos) {
+    cancelAnimationFrame(rafId);
+    running = false;
+    courtTitle.textContent = COURT_TITLE_DEFAULT;
+  } else {
+    resetPlay();
+  }
+}
+tabPositions.addEventListener("click", () => setMode("positions"));
+tabPlays.addEventListener("click", () => setMode("plays"));
+
+selectPlay("pickroll");
+setMode("positions");
 </script>
 
 </body>
