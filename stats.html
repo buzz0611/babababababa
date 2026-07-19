@@ -1,0 +1,1096 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>バスケットボール スタッツ記録・可視化</title>
+</head>
+<body>
+<style>
+  :root {
+    --bg: #f6f4ef;
+    --card: #ffffff;
+    --ink: #1f2430;
+    --sub: #5b6270;
+    --chip: #f0eee8;
+    --bar-bg: #edeae2;
+    --tip-bg: #fdf3ec;
+    --accent: #d95d39;
+    --danger: #c23b3b;
+    --shadow: 0 6px 24px rgba(31,36,48,.10);
+    --radius: 16px;
+    /* チャート配色（検証済みカテゴリカルパレット） */
+    --s-2p: #2a78d6;
+    --s-3p: #008300;
+    --s-ft: #e87ba4;
+    --grid: #e7e4dc;
+    --axis: #8b8f98;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1b1e25;
+      --card: #262a33;
+      --ink: #e8e9ec;
+      --sub: #9aa1ad;
+      --chip: #333844;
+      --bar-bg: #333844;
+      --tip-bg: #33291f;
+      --danger: #e06a6a;
+      --shadow: 0 6px 24px rgba(0,0,0,.35);
+      --s-2p: #3987e5;
+      --s-3p: #008300;
+      --s-ft: #d55181;
+      --grid: #333844;
+      --axis: #8b93a3;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #1b1e25;
+    --card: #262a33;
+    --ink: #e8e9ec;
+    --sub: #9aa1ad;
+    --chip: #333844;
+    --bar-bg: #333844;
+    --tip-bg: #33291f;
+    --danger: #e06a6a;
+    --shadow: 0 6px 24px rgba(0,0,0,.35);
+    --s-2p: #3987e5;
+    --s-3p: #008300;
+    --s-ft: #d55181;
+    --grid: #333844;
+    --axis: #8b93a3;
+  }
+  :root[data-theme="light"] {
+    --bg: #f6f4ef;
+    --card: #ffffff;
+    --ink: #1f2430;
+    --sub: #5b6270;
+    --chip: #f0eee8;
+    --bar-bg: #edeae2;
+    --tip-bg: #fdf3ec;
+    --danger: #c23b3b;
+    --shadow: 0 6px 24px rgba(31,36,48,.10);
+    --s-2p: #2a78d6;
+    --s-3p: #008300;
+    --s-ft: #e87ba4;
+    --grid: #e7e4dc;
+    --axis: #8b8f98;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Noto Sans JP", "Yu Gothic", Meiryo, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    line-height: 1.7;
+    -webkit-font-smoothing: antialiased;
+  }
+  header { text-align: center; padding: 40px 20px 8px; }
+  header h1 { font-size: clamp(1.4rem, 4vw, 2.1rem); letter-spacing: .04em; }
+  header h1 .ball { color: var(--accent); }
+  header p { color: var(--sub); margin-top: 8px; font-size: .95rem; }
+  .page-nav { text-align: center; margin: 10px 0 4px; }
+  .page-nav a {
+    color: var(--accent);
+    font-size: .9rem;
+    text-decoration: none;
+    border-bottom: 1px dashed currentColor;
+  }
+  .page-nav a:hover { opacity: .8; }
+
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 16px 20px 60px;
+    display: grid;
+    gap: 24px;
+  }
+  .two-col {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 24px;
+    align-items: start;
+  }
+  @media (max-width: 860px) {
+    .two-col { grid-template-columns: 1fr; }
+  }
+  .card {
+    background: var(--card);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 20px;
+  }
+  .card h2 {
+    font-size: 1.05rem;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card h2 .icon { color: var(--accent); }
+  .hint { color: var(--sub); font-size: .82rem; margin-top: 8px; }
+
+  /* ---- 動画 ---- */
+  .video-panel video {
+    width: 100%;
+    border-radius: 12px;
+    background: #000;
+    display: none;
+    max-height: 420px;
+  }
+  .video-panel video.loaded { display: block; }
+  .drop-zone {
+    border: 2px dashed var(--axis);
+    border-radius: 12px;
+    padding: 36px 20px;
+    text-align: center;
+    color: var(--sub);
+    font-size: .9rem;
+    cursor: pointer;
+    transition: border-color .15s ease, background .15s ease;
+  }
+  .drop-zone:hover, .drop-zone.dragover {
+    border-color: var(--accent);
+    background: var(--tip-bg);
+  }
+  .drop-zone strong { color: var(--ink); display: block; margin-bottom: 4px; }
+  .video-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    margin-top: 12px;
+  }
+  .video-controls button, .video-controls select {
+    background: var(--chip);
+    color: var(--ink);
+    border: none;
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: .85rem;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .video-controls button:hover { background: var(--bar-bg); }
+  .video-controls .time {
+    margin-left: auto;
+    font-variant-numeric: tabular-nums;
+    color: var(--sub);
+    font-size: .85rem;
+  }
+
+  /* ---- 選手 ---- */
+  .player-form { display: flex; gap: 8px; flex-wrap: wrap; }
+  .player-form input {
+    background: var(--chip);
+    border: 1px solid transparent;
+    border-radius: 8px;
+    padding: 8px 12px;
+    color: var(--ink);
+    font-family: inherit;
+    font-size: .9rem;
+  }
+  .player-form input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .player-form input.num { width: 72px; }
+  .player-form input.name { flex: 1; min-width: 140px; }
+  .btn {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-size: .9rem;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .btn:hover { opacity: .9; }
+  .btn.ghost {
+    background: var(--chip);
+    color: var(--ink);
+    font-weight: 500;
+  }
+  .btn.ghost:hover { background: var(--bar-bg); opacity: 1; }
+  .player-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .player-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--chip);
+    border-radius: 999px;
+    padding: 4px 6px 4px 14px;
+    font-size: .85rem;
+  }
+  .player-tag .del {
+    background: none;
+    border: none;
+    color: var(--sub);
+    cursor: pointer;
+    font-size: 1rem;
+    line-height: 1;
+    padding: 4px 6px;
+    border-radius: 50%;
+  }
+  .player-tag .del:hover { color: var(--danger); }
+
+  /* ---- 記録 ---- */
+  .selector { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+  .selector button {
+    background: var(--chip);
+    color: var(--ink);
+    border: 2px solid transparent;
+    border-radius: 999px;
+    padding: 6px 16px;
+    font-size: .9rem;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .selector button.active {
+    border-color: var(--accent);
+    background: var(--tip-bg);
+    font-weight: 700;
+  }
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+    gap: 8px;
+  }
+  .stat-grid button {
+    border: none;
+    border-radius: 10px;
+    padding: 12px 4px;
+    font-size: .9rem;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+    background: var(--chip);
+    color: var(--ink);
+    transition: transform .05s ease;
+  }
+  .stat-grid button:active { transform: scale(.96); }
+  .stat-grid button:disabled { opacity: .4; cursor: not-allowed; }
+  .stat-grid button.make { background: var(--accent); color: #fff; }
+  .stat-grid button .pts { display: block; font-size: .7rem; font-weight: 500; opacity: .85; }
+  .toast {
+    margin-top: 12px;
+    min-height: 1.6em;
+    font-size: .85rem;
+    color: var(--sub);
+  }
+
+  /* ---- ログ ---- */
+  .log-list { list-style: none; max-height: 320px; overflow-y: auto; }
+  .log-list li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 4px;
+    border-bottom: 1px solid var(--bar-bg);
+    font-size: .88rem;
+  }
+  .log-list .t {
+    background: var(--chip);
+    border: none;
+    border-radius: 6px;
+    padding: 2px 8px;
+    font-variant-numeric: tabular-nums;
+    font-size: .8rem;
+    cursor: pointer;
+    color: var(--ink);
+    font-family: inherit;
+    white-space: nowrap;
+  }
+  .log-list .t:hover { background: var(--bar-bg); }
+  .log-list .who { font-weight: 600; white-space: nowrap; }
+  .log-list .what { color: var(--sub); flex: 1; }
+  .log-list .del {
+    background: none;
+    border: none;
+    color: var(--sub);
+    cursor: pointer;
+    font-size: 1rem;
+    padding: 2px 6px;
+  }
+  .log-list .del:hover { color: var(--danger); }
+  .empty { color: var(--sub); font-size: .88rem; padding: 12px 0; }
+
+  /* ---- ボックススコア ---- */
+  .table-wrap { overflow-x: auto; }
+  table.box {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: .85rem;
+    white-space: nowrap;
+  }
+  table.box th, table.box td {
+    padding: 7px 10px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    border-bottom: 1px solid var(--bar-bg);
+  }
+  table.box th { color: var(--sub); font-weight: 600; }
+  table.box th:first-child, table.box td:first-child {
+    text-align: left;
+    position: sticky;
+    left: 0;
+    background: var(--card);
+  }
+  table.box td:first-child { font-weight: 600; }
+  table.box tr.total td { font-weight: 700; border-bottom: none; }
+  table.box td.pts { color: var(--accent); font-weight: 700; }
+
+  /* ---- チャート ---- */
+  .chart-card { position: relative; }
+  .chart-head {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: .8rem; color: var(--sub); }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+  .chart-card select {
+    background: var(--chip);
+    color: var(--ink);
+    border: none;
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: .85rem;
+    font-family: inherit;
+    cursor: pointer;
+  }
+  .chart-card svg { width: 100%; height: auto; display: block; }
+  .chart-card svg text { font-family: inherit; }
+  .viz-tip {
+    position: absolute;
+    pointer-events: none;
+    background: var(--ink);
+    color: var(--bg);
+    font-size: .78rem;
+    line-height: 1.5;
+    border-radius: 8px;
+    padding: 6px 10px;
+    opacity: 0;
+    transition: opacity .1s ease;
+    z-index: 10;
+    white-space: nowrap;
+    transform: translate(-50%, calc(-100% - 10px));
+  }
+  .viz-tip.show { opacity: 1; }
+
+  .export-row { display: flex; flex-wrap: wrap; gap: 10px; }
+
+  footer {
+    text-align: center;
+    color: var(--sub);
+    font-size: .8rem;
+    padding: 0 20px 40px;
+  }
+  .visually-hidden {
+    position: absolute;
+    width: 1px; height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+</style>
+
+<header>
+  <h1><span class="ball">🏀</span> スタッツ記録・可視化</h1>
+  <p>試合動画を見ながらプレーをワンタップで記録して、得点・アシスト・スティール・ブロックなどの成績をグラフで確認できます</p>
+  <nav class="page-nav"><a href="index.html">← ポジション解説アプリへ</a></nav>
+</header>
+
+<div class="container">
+
+  <div class="two-col">
+    <!-- 動画 -->
+    <section class="card video-panel">
+      <h2><span class="icon">▶</span> 試合動画</h2>
+      <div class="drop-zone" id="dropZone" role="button" tabindex="0"
+           aria-label="動画ファイルを選択">
+        <strong>動画ファイルを選択 / ドラッグ&amp;ドロップ</strong>
+        動画はこのブラウザ内で再生されるだけで、どこにもアップロードされません
+      </div>
+      <input type="file" id="videoFile" accept="video/*" class="visually-hidden">
+      <video id="video" controls playsinline></video>
+      <div class="video-controls" id="videoControls" hidden>
+        <button type="button" data-skip="-10">≪10秒</button>
+        <button type="button" data-skip="-5">＜5秒</button>
+        <button type="button" data-skip="5">5秒＞</button>
+        <button type="button" data-skip="10">10秒≫</button>
+        <select id="speed" aria-label="再生速度">
+          <option value="0.25">0.25x</option>
+          <option value="0.5">0.5x</option>
+          <option value="0.75">0.75x</option>
+          <option value="1" selected>1x</option>
+          <option value="1.5">1.5x</option>
+          <option value="2">2x</option>
+        </select>
+        <button type="button" id="changeVideo">動画を変更</button>
+        <span class="time" id="timeLabel">0:00</span>
+      </div>
+      <p class="hint">ショートカット: スペース = 再生/停止、← / → = 5秒スキップ（入力欄以外にフォーカスがあるとき）</p>
+    </section>
+
+    <!-- 選手 -->
+    <section class="card">
+      <h2><span class="icon">👥</span> 選手登録</h2>
+      <form class="player-form" id="playerForm">
+        <input class="num" id="playerNum" type="text" inputmode="numeric" placeholder="背番号" maxlength="3" aria-label="背番号">
+        <input class="name" id="playerName" type="text" placeholder="選手名（例: 山田）" maxlength="20" aria-label="選手名" required>
+        <button class="btn" type="submit">追加</button>
+      </form>
+      <div class="player-list" id="playerList"></div>
+      <p class="hint">記録したい選手を先に登録してください。選手を削除しても記録済みのプレーは残ります。</p>
+    </section>
+  </div>
+
+  <div class="two-col">
+    <!-- 記録 -->
+    <section class="card">
+      <h2><span class="icon">✏</span> プレーを記録</h2>
+      <div class="selector" id="playerSelector" role="radiogroup" aria-label="記録する選手"></div>
+      <div class="stat-grid" id="statGrid"></div>
+      <div style="margin-top:12px; display:flex; gap:8px;">
+        <button class="btn ghost" type="button" id="undoBtn">↩ 直前の記録を取り消す</button>
+      </div>
+      <p class="toast" id="toast" role="status" aria-live="polite"></p>
+    </section>
+
+    <!-- ログ -->
+    <section class="card">
+      <h2><span class="icon">📋</span> プレーログ</h2>
+      <ul class="log-list" id="logList"></ul>
+      <p class="hint">時刻をタップすると動画がそのプレーの3秒前にジャンプします。</p>
+    </section>
+  </div>
+
+  <!-- ボックススコア -->
+  <section class="card">
+    <h2><span class="icon">📊</span> ボックススコア</h2>
+    <div class="table-wrap">
+      <table class="box" id="boxTable" aria-label="選手別成績表"></table>
+    </div>
+    <p class="hint">PTS=得点 / 2P・3P・FT=成功-試投 / FG%=シュート成功率 / AST=アシスト / REB=リバウンド / STL=スティール / BLK=ブロック / TO=ターンオーバー / F=ファウル</p>
+  </section>
+
+  <!-- チャート -->
+  <section class="card chart-card">
+    <div class="chart-head">
+      <h2><span class="icon">🏆</span> 選手別の得点内訳</h2>
+      <div class="legend" aria-hidden="true">
+        <span><i style="background:var(--s-2p)"></i>2ポイント</span>
+        <span><i style="background:var(--s-3p)"></i>3ポイント</span>
+        <span><i style="background:var(--s-ft)"></i>フリースロー</span>
+      </div>
+    </div>
+    <div id="scoreChart"></div>
+    <div class="viz-tip" id="scoreTip"></div>
+  </section>
+
+  <section class="card chart-card">
+    <div class="chart-head">
+      <h2><span class="icon">📈</span> スタッツ比較</h2>
+      <select id="statSelect" aria-label="比較するスタッツ"></select>
+    </div>
+    <div id="statChart"></div>
+    <div class="viz-tip" id="statTip"></div>
+  </section>
+
+  <section class="card chart-card">
+    <div class="chart-head">
+      <h2><span class="icon">⏱</span> チーム得点の推移（動画時間）</h2>
+    </div>
+    <div id="timelineChart"></div>
+    <div class="viz-tip" id="timelineTip"></div>
+  </section>
+
+  <!-- エクスポート -->
+  <section class="card">
+    <h2><span class="icon">💾</span> データの保存</h2>
+    <div class="export-row">
+      <button class="btn ghost" type="button" id="exportBox">ボックススコアをCSV保存</button>
+      <button class="btn ghost" type="button" id="exportLog">プレーログをCSV保存</button>
+      <button class="btn ghost" type="button" id="resetBtn" style="margin-left:auto; color:var(--danger)">全データをリセット</button>
+    </div>
+    <p class="hint">記録はこのブラウザに自動保存されます（動画ファイル自体は保存されないため、再開時にもう一度選択してください）。</p>
+  </section>
+
+</div>
+
+<footer>タップ記録式のスタッツアプリです。動画の自動解析は行わず、見ながら記録する方式なので判定はいつでも正確です。</footer>
+
+<script>
+(() => {
+  "use strict";
+
+  // ---- 定義 ----
+  const EVENT_TYPES = {
+    p2m: { label: "2P成功", short: "2P○", pts: 2, make: true },
+    p2x: { label: "2P失敗", short: "2P×" },
+    p3m: { label: "3P成功", short: "3P○", pts: 3, make: true },
+    p3x: { label: "3P失敗", short: "3P×" },
+    ftm: { label: "FT成功", short: "FT○", pts: 1, make: true },
+    ftx: { label: "FT失敗", short: "FT×" },
+    ast: { label: "アシスト", short: "AST" },
+    reb: { label: "リバウンド", short: "REB" },
+    stl: { label: "スティール", short: "STL" },
+    blk: { label: "ブロック", short: "BLK" },
+    tov: { label: "ターンオーバー", short: "TO" },
+    pf:  { label: "ファウル", short: "F" },
+  };
+  const STAT_ORDER = ["p2m","p2x","p3m","p3x","ftm","ftx","ast","reb","stl","blk","tov","pf"];
+  const COMPARE_STATS = [
+    { key: "ast", label: "アシスト" },
+    { key: "reb", label: "リバウンド" },
+    { key: "stl", label: "スティール" },
+    { key: "blk", label: "ブロック" },
+    { key: "tov", label: "ターンオーバー" },
+    { key: "pf",  label: "ファウル" },
+  ];
+  const STORAGE_KEY = "bball-stats-v1";
+
+  // ---- 状態 ----
+  let state = { players: [], events: [], selectedPlayerId: null, compareStat: "ast" };
+
+  function load() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const s = JSON.parse(raw);
+        if (Array.isArray(s.players) && Array.isArray(s.events)) {
+          state = Object.assign(state, s);
+        }
+      }
+    } catch (e) { /* 壊れたデータは無視して初期状態で開始 */ }
+  }
+  function save() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
+  }
+
+  const $ = (id) => document.getElementById(id);
+  const video = $("video");
+
+  function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+  function fmtTime(sec) {
+    if (sec == null || isNaN(sec)) return "--:--";
+    sec = Math.max(0, Math.floor(sec));
+    const m = Math.floor(sec / 60), s = sec % 60;
+    return m + ":" + String(s).padStart(2, "0");
+  }
+  function playerLabel(p) { return (p.num !== "" ? "#" + p.num + " " : "") + p.name; }
+  function findPlayer(id) { return state.players.find(p => p.id === id); }
+  function playerName(id) {
+    const p = findPlayer(id);
+    if (p) return playerLabel(p);
+    const ev = state.events.find(e => e.playerId === id && e.playerSnapshot);
+    return ev ? ev.playerSnapshot + "（削除済み）" : "不明な選手";
+  }
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, c =>
+      ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" })[c]);
+  }
+
+  // ---- 集計 ----
+  function statLine(playerId) {
+    const line = { pts: 0 };
+    for (const k of STAT_ORDER) line[k] = 0;
+    for (const ev of state.events) {
+      if (ev.playerId !== playerId) continue;
+      line[ev.type] = (line[ev.type] || 0) + 1;
+      const def = EVENT_TYPES[ev.type];
+      if (def && def.pts) line.pts += def.pts;
+    }
+    line.fgm = line.p2m + line.p3m;
+    line.fga = line.p2m + line.p2x + line.p3m + line.p3x;
+    return line;
+  }
+  function allPlayerIds() {
+    const ids = state.players.map(p => p.id);
+    for (const ev of state.events) if (!ids.includes(ev.playerId)) ids.push(ev.playerId);
+    return ids;
+  }
+
+  // ---- 動画 ----
+  const dropZone = $("dropZone");
+  const fileInput = $("videoFile");
+  function loadVideoFile(file) {
+    if (!file || !file.type.startsWith("video/")) return;
+    if (video.dataset.url) URL.revokeObjectURL(video.dataset.url);
+    const url = URL.createObjectURL(file);
+    video.src = url;
+    video.dataset.url = url;
+    video.classList.add("loaded");
+    dropZone.hidden = true;
+    $("videoControls").hidden = false;
+  }
+  dropZone.addEventListener("click", () => fileInput.click());
+  dropZone.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fileInput.click(); }
+  });
+  fileInput.addEventListener("change", () => loadVideoFile(fileInput.files[0]));
+  dropZone.addEventListener("dragover", (e) => { e.preventDefault(); dropZone.classList.add("dragover"); });
+  dropZone.addEventListener("dragleave", () => dropZone.classList.remove("dragover"));
+  dropZone.addEventListener("drop", (e) => {
+    e.preventDefault();
+    dropZone.classList.remove("dragover");
+    loadVideoFile(e.dataTransfer.files[0]);
+  });
+  $("changeVideo").addEventListener("click", () => fileInput.click());
+  $("speed").addEventListener("change", (e) => { video.playbackRate = parseFloat(e.target.value); });
+  document.querySelectorAll("[data-skip]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      video.currentTime = Math.max(0, video.currentTime + Number(btn.dataset.skip));
+    });
+  });
+  video.addEventListener("timeupdate", () => {
+    $("timeLabel").textContent = fmtTime(video.currentTime) + " / " + fmtTime(video.duration);
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.target.closest("input, select, textarea, button, a, video")) return;
+    if (!video.classList.contains("loaded")) return;
+    if (e.key === " ") { e.preventDefault(); video.paused ? video.play() : video.pause(); }
+    else if (e.key === "ArrowLeft") { e.preventDefault(); video.currentTime = Math.max(0, video.currentTime - 5); }
+    else if (e.key === "ArrowRight") { e.preventDefault(); video.currentTime += 5; }
+  });
+
+  // ---- 選手 ----
+  $("playerForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const name = $("playerName").value.trim();
+    const num = $("playerNum").value.trim();
+    if (!name) return;
+    const player = { id: uid(), name, num };
+    state.players.push(player);
+    if (!state.selectedPlayerId) state.selectedPlayerId = player.id;
+    $("playerName").value = "";
+    $("playerNum").value = "";
+    $("playerName").focus();
+    save(); renderAll();
+  });
+
+  function removePlayer(id) {
+    const p = findPlayer(id);
+    const count = state.events.filter(e => e.playerId === id).length;
+    const msg = count
+      ? playerLabel(p) + " を一覧から外しますか？（記録済みの" + count + "件のプレーは残ります）"
+      : playerLabel(p) + " を削除しますか？";
+    if (!confirm(msg)) return;
+    state.players = state.players.filter(x => x.id !== id);
+    if (state.selectedPlayerId === id) {
+      state.selectedPlayerId = state.players.length ? state.players[0].id : null;
+    }
+    save(); renderAll();
+  }
+
+  // ---- 記録 ----
+  function addEvent(type) {
+    if (!state.selectedPlayerId) return;
+    const p = findPlayer(state.selectedPlayerId);
+    const t = video.classList.contains("loaded") && !isNaN(video.currentTime)
+      ? video.currentTime : null;
+    state.events.push({
+      id: uid(),
+      playerId: state.selectedPlayerId,
+      playerSnapshot: p ? playerLabel(p) : "",
+      type, t,
+      created: Date.now(),
+    });
+    const def = EVENT_TYPES[type];
+    $("toast").textContent = "✔ " + (p ? playerLabel(p) : "") + " " + def.label +
+      (t != null ? "（" + fmtTime(t) + "）" : "") + " を記録しました";
+    save(); renderAll();
+  }
+  $("undoBtn").addEventListener("click", () => {
+    const ev = state.events.pop();
+    if (!ev) return;
+    $("toast").textContent = "↩ " + playerName(ev.playerId) + " の " +
+      EVENT_TYPES[ev.type].label + " を取り消しました";
+    save(); renderAll();
+  });
+
+  // ---- レンダリング ----
+  function renderPlayers() {
+    const list = $("playerList");
+    list.innerHTML = "";
+    if (!state.players.length) {
+      list.innerHTML = '<p class="empty">まだ選手が登録されていません</p>';
+    }
+    for (const p of state.players) {
+      const tag = document.createElement("span");
+      tag.className = "player-tag";
+      tag.innerHTML = esc(playerLabel(p)) +
+        '<button type="button" class="del" aria-label="' + esc(playerLabel(p)) + 'を削除">×</button>';
+      tag.querySelector(".del").addEventListener("click", () => removePlayer(p.id));
+      list.appendChild(tag);
+    }
+
+    const sel = $("playerSelector");
+    sel.innerHTML = "";
+    if (!state.players.length) {
+      sel.innerHTML = '<p class="empty">上のカードで選手を登録すると記録できるようになります</p>';
+    }
+    for (const p of state.players) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.textContent = playerLabel(p);
+      b.setAttribute("role", "radio");
+      b.setAttribute("aria-checked", String(p.id === state.selectedPlayerId));
+      if (p.id === state.selectedPlayerId) b.classList.add("active");
+      b.addEventListener("click", () => {
+        state.selectedPlayerId = p.id;
+        save(); renderPlayers();
+      });
+      sel.appendChild(b);
+    }
+    document.querySelectorAll("#statGrid button").forEach(b => {
+      b.disabled = !state.selectedPlayerId;
+    });
+  }
+
+  function buildStatGrid() {
+    const grid = $("statGrid");
+    grid.innerHTML = "";
+    for (const key of STAT_ORDER) {
+      const def = EVENT_TYPES[key];
+      const b = document.createElement("button");
+      b.type = "button";
+      if (def.make) b.classList.add("make");
+      b.innerHTML = esc(def.label) + (def.pts ? '<span class="pts">+' + def.pts + '点</span>' : "");
+      b.addEventListener("click", () => addEvent(key));
+      grid.appendChild(b);
+    }
+  }
+
+  function renderLog() {
+    const list = $("logList");
+    list.innerHTML = "";
+    if (!state.events.length) {
+      list.innerHTML = '<p class="empty">まだ記録がありません。動画を再生しながらプレーをタップで記録しましょう。</p>';
+      return;
+    }
+    const events = [...state.events].reverse();
+    for (const ev of events) {
+      const li = document.createElement("li");
+      const def = EVENT_TYPES[ev.type];
+      li.innerHTML =
+        '<button type="button" class="t" title="動画をこのプレーへ">' + fmtTime(ev.t) + "</button>" +
+        '<span class="who">' + esc(playerName(ev.playerId)) + "</span>" +
+        '<span class="what">' + esc(def.label) + (def.pts ? " +" + def.pts : "") + "</span>" +
+        '<button type="button" class="del" aria-label="この記録を削除">×</button>';
+      li.querySelector(".t").addEventListener("click", () => {
+        if (ev.t == null || !video.classList.contains("loaded")) return;
+        video.currentTime = Math.max(0, ev.t - 3);
+        video.play();
+      });
+      li.querySelector(".del").addEventListener("click", () => {
+        state.events = state.events.filter(x => x.id !== ev.id);
+        save(); renderAll();
+      });
+      list.appendChild(li);
+    }
+  }
+
+  function renderBox() {
+    const table = $("boxTable");
+    const ids = allPlayerIds();
+    let html = "<thead><tr><th scope='col'>選手</th><th>PTS</th><th>2P</th><th>3P</th><th>FT</th><th>FG%</th>" +
+      "<th>AST</th><th>REB</th><th>STL</th><th>BLK</th><th>TO</th><th>F</th></tr></thead><tbody>";
+    const total = { pts:0, p2m:0, p2x:0, p3m:0, p3x:0, ftm:0, ftx:0, ast:0, reb:0, stl:0, blk:0, tov:0, pf:0, fgm:0, fga:0 };
+    for (const id of ids) {
+      const s = statLine(id);
+      for (const k in total) total[k] += s[k] || 0;
+      html += "<tr><td>" + esc(playerName(id)) + "</td>" +
+        '<td class="pts">' + s.pts + "</td>" +
+        "<td>" + s.p2m + "-" + (s.p2m + s.p2x) + "</td>" +
+        "<td>" + s.p3m + "-" + (s.p3m + s.p3x) + "</td>" +
+        "<td>" + s.ftm + "-" + (s.ftm + s.ftx) + "</td>" +
+        "<td>" + (s.fga ? Math.round(100 * s.fgm / s.fga) + "%" : "–") + "</td>" +
+        "<td>" + s.ast + "</td><td>" + s.reb + "</td><td>" + s.stl + "</td>" +
+        "<td>" + s.blk + "</td><td>" + s.tov + "</td><td>" + s.pf + "</td></tr>";
+    }
+    if (!ids.length) {
+      html += '<tr><td colspan="12" style="text-align:left;color:var(--sub)">選手を登録してプレーを記録すると、ここに成績が表示されます</td></tr>';
+    } else {
+      html += '<tr class="total"><td>チーム合計</td>' +
+        '<td class="pts">' + total.pts + "</td>" +
+        "<td>" + total.p2m + "-" + (total.p2m + total.p2x) + "</td>" +
+        "<td>" + total.p3m + "-" + (total.p3m + total.p3x) + "</td>" +
+        "<td>" + total.ftm + "-" + (total.ftm + total.ftx) + "</td>" +
+        "<td>" + (total.fga ? Math.round(100 * total.fgm / total.fga) + "%" : "–") + "</td>" +
+        "<td>" + total.ast + "</td><td>" + total.reb + "</td><td>" + total.stl + "</td>" +
+        "<td>" + total.blk + "</td><td>" + total.tov + "</td><td>" + total.pf + "</td></tr>";
+    }
+    table.innerHTML = html + "</tbody>";
+  }
+
+  // ---- チャート共通 ----
+  const SVG_NS = "http://www.w3.org/2000/svg";
+  function svgEl(tag, attrs) {
+    const el = document.createElementNS(SVG_NS, tag);
+    for (const k in attrs) el.setAttribute(k, attrs[k]);
+    return el;
+  }
+  function showTip(tip, card, x, y, html) {
+    const rect = card.getBoundingClientRect();
+    tip.innerHTML = html;
+    tip.style.left = (x - rect.left) + "px";
+    tip.style.top = (y - rect.top) + "px";
+    tip.classList.add("show");
+  }
+  function hideTip(tip) { tip.classList.remove("show"); }
+  // 横棒グラフの右端だけを丸めたパス
+  function roundedRightBar(x, y, w, h, r) {
+    r = Math.min(r, w, h / 2);
+    return "M" + x + " " + y +
+      " h" + (w - r) + " a" + r + " " + r + " 0 0 1 " + r + " " + r +
+      " v" + (h - 2 * r) + " a" + r + " " + r + " 0 0 1 " + (-r) + " " + r +
+      " h" + (-(w - r)) + " Z";
+  }
+
+  const ROW_H = 30, ROW_GAP = 12, LABEL_W = 118, PAD_R = 44, CHART_W = 640;
+
+  function chartRows(container, rows, maxValue, drawRow) {
+    // rows: [{name, ...}] — 共通の横棒レイアウト
+    container.innerHTML = "";
+    if (!rows.length || maxValue <= 0) {
+      container.innerHTML = '<p class="empty">まだ記録がありません</p>';
+      return null;
+    }
+    const h = rows.length * (ROW_H + ROW_GAP) + 24;
+    const svg = svgEl("svg", { viewBox: "0 0 " + CHART_W + " " + h, role: "img" });
+    const plotW = CHART_W - LABEL_W - PAD_R;
+    // 目盛り（グリッド）
+    const step = niceStep(maxValue, 5);
+    for (let v = 0; v <= maxValue; v += step) {
+      const x = LABEL_W + (v / maxValue) * plotW;
+      svg.appendChild(svgEl("line", { x1: x, y1: 0, x2: x, y2: h - 24, stroke: "var(--grid)", "stroke-width": 1 }));
+      const t = svgEl("text", { x, y: h - 6, "text-anchor": "middle", "font-size": 11, fill: "var(--axis)" });
+      t.textContent = v;
+      svg.appendChild(t);
+    }
+    rows.forEach((row, i) => {
+      const y = i * (ROW_H + ROW_GAP) + 4;
+      const name = svgEl("text", {
+        x: LABEL_W - 10, y: y + ROW_H / 2 + 4,
+        "text-anchor": "end", "font-size": 12.5, fill: "var(--ink)", "font-weight": 600,
+      });
+      name.textContent = row.name.length > 9 ? row.name.slice(0, 8) + "…" : row.name;
+      svg.appendChild(name);
+      drawRow(svg, row, y, plotW);
+    });
+    container.appendChild(svg);
+    return svg;
+  }
+  function niceStep(max, targetTicks) {
+    const raw = max / targetTicks;
+    const pow = Math.pow(10, Math.floor(Math.log10(Math.max(raw, 1))));
+    for (const m of [1, 2, 5, 10]) if (raw <= m * pow) return m * pow;
+    return 10 * pow;
+  }
+
+  // ---- 得点内訳（スタック横棒） ----
+  function renderScoreChart() {
+    const card = $("scoreChart").parentElement;
+    const tip = $("scoreTip");
+    const rows = allPlayerIds().map(id => {
+      const s = statLine(id);
+      return { name: playerName(id), p2: s.p2m * 2, p3: s.p3m * 3, ft: s.ftm, total: s.pts };
+    }).filter(r => r.total > 0).sort((a, b) => b.total - a.total);
+    const max = Math.max(...rows.map(r => r.total), 0);
+    const segs = [
+      { key: "p2", label: "2ポイント", color: "var(--s-2p)" },
+      { key: "p3", label: "3ポイント", color: "var(--s-3p)" },
+      { key: "ft", label: "フリースロー", color: "var(--s-ft)" },
+    ];
+    chartRows($("scoreChart"), rows, max, (svg, row, y, plotW) => {
+      let x = LABEL_W;
+      const parts = segs.filter(s => row[s.key] > 0);
+      parts.forEach((seg, idx) => {
+        const w = (row[seg.key] / max) * plotW;
+        const isLast = idx === parts.length - 1;
+        const gap = isLast ? 0 : 2;
+        const shape = isLast
+          ? svgEl("path", { d: roundedRightBar(x, y, Math.max(w, 4), ROW_H, 4), fill: seg.color })
+          : svgEl("rect", { x, y, width: Math.max(w - gap, 1), height: ROW_H, fill: seg.color });
+        shape.style.cursor = "default";
+        shape.addEventListener("mousemove", (e) =>
+          showTip(tip, card, e.clientX, e.clientY,
+            "<strong>" + esc(row.name) + "</strong><br>" + seg.label + ": " + row[seg.key] + "点 / 合計 " + row.total + "点"));
+        shape.addEventListener("mouseleave", () => hideTip(tip));
+        svg.appendChild(shape);
+        x += w;
+      });
+      const label = svgEl("text", {
+        x: x + 8, y: y + ROW_H / 2 + 4.5,
+        "font-size": 13, "font-weight": 700, fill: "var(--ink)",
+      });
+      label.textContent = row.total;
+      svg.appendChild(label);
+    });
+  }
+
+  // ---- スタッツ比較（単色横棒） ----
+  function buildStatSelect() {
+    const sel = $("statSelect");
+    sel.innerHTML = COMPARE_STATS.map(s =>
+      '<option value="' + s.key + '">' + s.label + "</option>").join("");
+    sel.value = state.compareStat;
+    sel.addEventListener("change", () => {
+      state.compareStat = sel.value;
+      save(); renderStatChart();
+    });
+  }
+  function renderStatChart() {
+    const card = $("statChart").parentElement;
+    const tip = $("statTip");
+    const def = COMPARE_STATS.find(s => s.key === state.compareStat) || COMPARE_STATS[0];
+    const rows = allPlayerIds().map(id => {
+      const s = statLine(id);
+      return { name: playerName(id), value: s[def.key] || 0 };
+    }).filter(r => r.value > 0).sort((a, b) => b.value - a.value);
+    const max = Math.max(...rows.map(r => r.value), 0);
+    chartRows($("statChart"), rows, max, (svg, row, y, plotW) => {
+      const w = Math.max((row.value / max) * plotW, 4);
+      const bar = svgEl("path", { d: roundedRightBar(LABEL_W, y, w, ROW_H, 4), fill: "var(--s-2p)" });
+      bar.addEventListener("mousemove", (e) =>
+        showTip(tip, card, e.clientX, e.clientY,
+          "<strong>" + esc(row.name) + "</strong><br>" + def.label + ": " + row.value));
+      bar.addEventListener("mouseleave", () => hideTip(tip));
+      svg.appendChild(bar);
+      const label = svgEl("text", {
+        x: LABEL_W + w + 8, y: y + ROW_H / 2 + 4.5,
+        "font-size": 13, "font-weight": 700, fill: "var(--ink)",
+      });
+      label.textContent = row.value;
+      svg.appendChild(label);
+    });
+  }
+
+  // ---- 得点推移（折れ線） ----
+  function renderTimeline() {
+    const container = $("timelineChart");
+    const card = container.parentElement;
+    const tip = $("timelineTip");
+    container.innerHTML = "";
+    const scoring = state.events
+      .filter(ev => EVENT_TYPES[ev.type].pts && ev.t != null)
+      .sort((a, b) => a.t - b.t);
+    if (scoring.length < 2) {
+      container.innerHTML = '<p class="empty">動画を読み込んだ状態で得点を2回以上記録すると、時間ごとの得点推移が表示されます</p>';
+      return;
+    }
+    let cum = 0;
+    const points = scoring.map(ev => {
+      cum += EVENT_TYPES[ev.type].pts;
+      return { t: ev.t, score: cum, ev };
+    });
+    const W = 640, H = 260, padL = 44, padR = 16, padT = 14, padB = 30;
+    const maxT = points[points.length - 1].t;
+    const maxS = cum;
+    const x = (t) => padL + (t / Math.max(maxT, 1)) * (W - padL - padR);
+    const y = (s) => H - padB - (s / maxS) * (H - padT - padB);
+    const svg = svgEl("svg", { viewBox: "0 0 " + W + " " + H, role: "img" });
+
+    const yStep = niceStep(maxS, 4);
+    for (let v = 0; v <= maxS; v += yStep) {
+      svg.appendChild(svgEl("line", { x1: padL, y1: y(v), x2: W - padR, y2: y(v), stroke: "var(--grid)", "stroke-width": 1 }));
+      const t = svgEl("text", { x: padL - 8, y: y(v) + 4, "text-anchor": "end", "font-size": 11, fill: "var(--axis)" });
+      t.textContent = v;
+      svg.appendChild(t);
+    }
+    const tickSecs = [15, 30, 60, 120, 300, 600, 900, 1800, 3600];
+    const tStep = tickSecs.find(s => maxT / s <= 6) || 3600;
+    for (let v = 0; v <= maxT; v += tStep) {
+      const t = svgEl("text", { x: x(v), y: H - 8, "text-anchor": "middle", "font-size": 11, fill: "var(--axis)" });
+      t.textContent = fmtTime(v);
+      svg.appendChild(t);
+    }
+    svg.appendChild(svgEl("line", { x1: padL, y1: H - padB, x2: W - padR, y2: H - padB, stroke: "var(--axis)", "stroke-width": 1 }));
+
+    // ステップ状の折れ線（得点が入った瞬間に増える）
+    let d = "M" + x(points[0].t) + " " + y(0);
+    for (const p of points) d += " L" + x(p.t) + " " + y(p.score - EVENT_TYPES[p.ev.type].pts) + " L" + x(p.t) + " " + y(p.score);
+    svg.appendChild(svgEl("path", { d, fill: "none", stroke: "var(--s-2p)", "stroke-width": 2, "stroke-linejoin": "round" }));
+
+    for (const p of points) {
+      svg.appendChild(svgEl("circle", { cx: x(p.t), cy: y(p.score), r: 3.5, fill: "var(--s-2p)", stroke: "var(--card)", "stroke-width": 2 }));
+    }
+    // ホバー: 一番近い得点イベントを表示
+    const overlay = svgEl("rect", { x: padL, y: 0, width: W - padL - padR, height: H - padB, fill: "transparent" });
+    const cursor = svgEl("line", { x1: 0, y1: padT, x2: 0, y2: H - padB, stroke: "var(--axis)", "stroke-width": 1, "stroke-dasharray": "3 3", opacity: 0 });
+    svg.appendChild(cursor);
+    overlay.addEventListener("mousemove", (e) => {
+      const svgRect = svg.getBoundingClientRect();
+      const mx = (e.clientX - svgRect.left) / svgRect.width * W;
+      let nearest = points[0];
+      for (const p of points) if (Math.abs(x(p.t) - mx) < Math.abs(x(nearest.t) - mx)) nearest = p;
+      cursor.setAttribute("x1", x(nearest.t));
+      cursor.setAttribute("x2", x(nearest.t));
+      cursor.setAttribute("opacity", 1);
+      showTip(tip, card,
+        svgRect.left + x(nearest.t) / W * svgRect.width,
+        svgRect.top + y(nearest.score) / H * svgRect.height,
+        "<strong>" + fmtTime(nearest.t) + "</strong> " + esc(playerName(nearest.ev.playerId)) + "<br>" +
+        EVENT_TYPES[nearest.ev.type].label + " → 合計 " + nearest.score + "点");
+    });
+    overlay.addEventListener("mouseleave", () => { cursor.setAttribute("opacity", 0); hideTip(tip); });
+    svg.appendChild(overlay);
+    container.appendChild(svg);
+  }
+
+  // ---- エクスポート ----
+  function downloadCSV(filename, rows) {
+    const csv = "﻿" + rows.map(r =>
+      r.map(c => '"' + String(c).replace(/"/g, '""') + '"').join(",")).join("\r\n");
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+  $("exportBox").addEventListener("click", () => {
+    const rows = [["選手","PTS","2P成功","2P試投","3P成功","3P試投","FT成功","FT試投","FG%","AST","REB","STL","BLK","TO","F"]];
+    for (const id of allPlayerIds()) {
+      const s = statLine(id);
+      rows.push([playerName(id), s.pts, s.p2m, s.p2m + s.p2x, s.p3m, s.p3m + s.p3x,
+        s.ftm, s.ftm + s.ftx, s.fga ? Math.round(100 * s.fgm / s.fga) + "%" : "",
+        s.ast, s.reb, s.stl, s.blk, s.tov, s.pf]);
+    }
+    downloadCSV("boxscore.csv", rows);
+  });
+  $("exportLog").addEventListener("click", () => {
+    const rows = [["動画時間","選手","プレー","得点"]];
+    for (const ev of state.events) {
+      const def = EVENT_TYPES[ev.type];
+      rows.push([ev.t != null ? fmtTime(ev.t) : "", playerName(ev.playerId), def.label, def.pts || ""]);
+    }
+    downloadCSV("playlog.csv", rows);
+  });
+  $("resetBtn").addEventListener("click", () => {
+    if (!confirm("選手・記録をすべて削除します。よろしいですか？")) return;
+    state = { players: [], events: [], selectedPlayerId: null, compareStat: "ast" };
+    save(); renderAll();
+    $("toast").textContent = "データをリセットしました";
+  });
+
+  function renderAll() {
+    renderPlayers();
+    renderLog();
+    renderBox();
+    renderScoreChart();
+    renderStatChart();
+    renderTimeline();
+  }
+
+  load();
+  buildStatGrid();
+  buildStatSelect();
+  renderAll();
+})();
+</script>
+</body>
+</html>
