@@ -393,6 +393,13 @@
     box-sizing: border-box;
     border-radius: 3px;
   }
+  .rim-box::after {
+    /* 上35%=リング上ゾーン / 下=ネットゾーン の分割線 */
+    content: "";
+    position: absolute;
+    left: 0; right: 0; top: 35%;
+    border-top: 1.5px dashed rgba(255,255,255,.9);
+  }
   .rim-box .rlabel {
     position: absolute; top: -17px; left: -2px;
     font-size: .68rem; font-weight: 700;
@@ -497,16 +504,17 @@
     </section>
   </div>
 
-  <!-- 得点の自動検出 -->
+  <!-- シュートの自動検出 -->
   <section class="card">
-    <h2><span class="icon">🎯</span> 得点の自動検出（ベータ）</h2>
+    <h2><span class="icon">🎯</span> シュートの自動検出（ベータ）</h2>
     <p class="hint" style="margin-top:0; margin-bottom:12px">
-      固定カメラ向けの試験機能です。リングを囲むと、ネット付近の動きから<strong>得点らしき瞬間を候補として自動抽出</strong>します。
-      選手とシュート種別は候補を確認して確定してください（誤検出・見逃しが出るので、感度を調整しながら使います）。
-      カメラを固定していれば、囲んだリング位置は次回以降も保存されます。
+      固定カメラ向けの試験機能です。動画上で<strong>リングとネット全体をドラッグで囲む</strong>と、
+      「リング上→ネット」の順に動きが通過した瞬間を<strong>シュート候補</strong>として抽出します
+      （成功だけでなくリムアウトの失敗も拾えます。人が横切っただけの動きは自動で除外します）。
+      候補を再生で確認して、選手と結果を確定してください。囲んだリング位置は次回以降も保存されます。
     </p>
     <div class="detect-controls">
-      <button class="btn ghost" type="button" id="rimSetBtn" disabled>① リング位置を設定</button>
+      <button class="btn ghost" type="button" id="rimSetBtn" disabled>① リングを囲む</button>
       <label class="sens">感度<span>低</span>
         <input type="range" id="sensRange" min="1" max="5" step="1" value="3" aria-label="検出感度">
         <span>高</span></label>
@@ -1145,14 +1153,15 @@
     candidates = [];
     lastSeries = null;
     rimSetting = false;
-    $("rimSetBtn").textContent = "① リング位置を設定";
+    $("rimSetBtn").textContent = "① リングを囲む";
     save(); renderAll();
     $("toast").textContent = "データをリセットしました";
   });
 
-  // ==== 得点の自動検出（β） ====
-  // 固定カメラ前提。リング付近の画素変化スパイクから得点候補を拾い、
-  // 選手・種別は人が確定する半自動フロー（Cレベル）。
+  // ==== シュートの自動検出（β） ====
+  // 固定カメラ前提。リング枠を上35%(リング上)/下65%(ネット)に分割し、
+  // 「リング上→ネット」の順に短い動きが通過した瞬間だけをシュート候補にする。
+  // 0.6秒以上続く動きは人の横切りとして除外（実映像で検証済みのパラメータ）。
   const rimOverlay = $("rimOverlay");
   let rimSetting = false;
   let candidates = [];
@@ -1166,7 +1175,7 @@
     $("analyzeBtn").disabled = !ready;
     $("rimSetBtn").disabled = !ready;
     if (ready && $("detectToast").textContent === "まず上で動画を読み込んでください。") {
-      $("detectToast").textContent = "「① リング位置を設定」でネット付近を囲み、「② 動画を解析」を押してください。";
+      $("detectToast").textContent = "「① リングを囲む」でリングとネット全体をドラッグで囲み、「② 動画を解析」を押してください。";
     }
     renderRims();
   }
@@ -1196,35 +1205,64 @@
   $("rimSetBtn").addEventListener("click", () => {
     if (!videoReady()) return;
     rimSetting = !rimSetting;
-    $("rimSetBtn").textContent = rimSetting ? "✓ 設定を終える" : "① リング位置を設定";
+    $("rimSetBtn").textContent = rimSetting ? "✓ 設定を終える" : "① リングを囲む";
     $("detectToast").textContent = rimSetting
-      ? "動画のネット付近をクリックしてリングを囲ってください（左右2つのゴールが写っていれば両方）。"
+      ? "動画の上で、リングとネット全体が収まるようにドラッグして囲ってください（試合で使うゴールだけでOK）。"
       : "リング位置を保存しました。「② 動画を解析」を押してください。";
     renderRims();
   });
 
-  rimOverlay.addEventListener("click", (e) => {
+  // ドラッグでリング枠を描く（タップだけの場合は小さめの既定枠）
+  let drawStart = null, drawPreview = null;
+  rimOverlay.addEventListener("pointerdown", (e) => {
     if (!rimSetting || !videoReady()) return;
     if (e.target.closest(".rdel")) return;
     const rect = rimOverlay.getBoundingClientRect();
-    const nx = (e.clientX - rect.left) / rect.width;
-    const ny = (e.clientY - rect.top) / rect.height;
-    const w = 0.08, h = 0.09;
-    state.rims.push({
-      x: Math.min(Math.max(nx - w / 2, 0), 1 - w),
-      y: Math.min(Math.max(ny - h / 2, 0), 1 - h),
-      w, h,
-    });
+    drawStart = { x: (e.clientX - rect.left) / rect.width, y: (e.clientY - rect.top) / rect.height };
+    drawPreview = document.createElement("div");
+    drawPreview.className = "rim-box";
+    rimOverlay.appendChild(drawPreview);
+    rimOverlay.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+  rimOverlay.addEventListener("pointermove", (e) => {
+    if (!drawStart || !drawPreview) return;
+    const rect = rimOverlay.getBoundingClientRect();
+    const cx = Math.min(Math.max((e.clientX - rect.left) / rect.width, 0), 1);
+    const cy = Math.min(Math.max((e.clientY - rect.top) / rect.height, 0), 1);
+    const x = Math.min(drawStart.x, cx), y = Math.min(drawStart.y, cy);
+    drawPreview.style.left = (x * 100) + "%";
+    drawPreview.style.top = (y * 100) + "%";
+    drawPreview.style.width = (Math.abs(cx - drawStart.x) * 100) + "%";
+    drawPreview.style.height = (Math.abs(cy - drawStart.y) * 100) + "%";
+  });
+  rimOverlay.addEventListener("pointerup", (e) => {
+    if (!drawStart) return;
+    const rect = rimOverlay.getBoundingClientRect();
+    const cx = Math.min(Math.max((e.clientX - rect.left) / rect.width, 0), 1);
+    const cy = Math.min(Math.max((e.clientY - rect.top) / rect.height, 0), 1);
+    let x = Math.min(drawStart.x, cx), y = Math.min(drawStart.y, cy);
+    let w = Math.abs(cx - drawStart.x), h = Math.abs(cy - drawStart.y);
+    if (w < 0.005 || h < 0.005) {
+      // ただのタップ: 小さめの既定枠を置く
+      w = 0.05; h = 0.08;
+      x = Math.min(Math.max(drawStart.x - w / 2, 0), 1 - w);
+      y = Math.min(Math.max(drawStart.y - h / 2, 0), 1 - h);
+    }
+    state.rims.push({ x, y, w, h });
+    drawStart = null;
+    if (drawPreview) { drawPreview.remove(); drawPreview = null; }
+    lastSeries = null; // 枠が変わったので前回の解析結果は無効
     save(); renderRims();
   });
 
   $("sensRange").addEventListener("change", () => { if (lastSeries) runDetection(lastSeries); });
   function sensParams() {
     const v = parseInt($("sensRange").value, 10) || 3;
-    // k: 中央値からの外れ幅（MAD基準）/ floor: 系列内最大に対する下限比
+    // k: 中央値+MAD基準の外れ幅 / floor: 動いた画素割合の下限（実映像で調整済み）
     return {
-      k: [4.0, 3.2, 2.5, 1.9, 1.3][v - 1],
-      floor: [0.32, 0.26, 0.20, 0.15, 0.10][v - 1],
+      k: [4.5, 3.7, 3.0, 2.4, 1.8][v - 1],
+      floor: [0.016, 0.012, 0.008, 0.005, 0.003][v - 1],
     };
   }
 
@@ -1232,50 +1270,69 @@
   async function analyze() {
     if (!videoReady()) return;
     if (!state.rims || !state.rims.length) {
-      $("detectToast").textContent = "先に「① リング位置を設定」でリングを囲ってください。";
+      $("detectToast").textContent = "先に「① リングを囲む」でリングとネット全体を囲ってください。";
       return;
     }
     if (rimSetting) {
       rimSetting = false;
-      $("rimSetBtn").textContent = "① リング位置を設定";
+      $("rimSetBtn").textContent = "① リングを囲む";
       renderRims();
     }
 
-    const sw = 480;
-    const sh = Math.max(1, Math.round(sw * video.videoHeight / video.videoWidth));
+    // ネイティブ解像度でリング枠内だけを切り出す（縮小すると遠いリングの信号が消える）
+    const vw = video.videoWidth, vh = video.videoHeight;
+    const MAXD = 256; // 巨大な枠だけ縮小
     const canvas = document.createElement("canvas");
-    canvas.width = sw; canvas.height = sh;
+    canvas.width = MAXD; canvas.height = MAXD;
     const cx = canvas.getContext("2d", { willReadFrequently: true });
     const rims = state.rims.slice();
-    const series = rims.map(() => []);
-    const prev = rims.map(() => null);
+    const zonesOf = (r) => {
+      const sx = Math.floor(r.x * vw), sy = Math.floor(r.y * vh);
+      const sw = Math.max(2, Math.floor(r.w * vw)), sh = Math.max(3, Math.floor(r.h * vh));
+      const ah = Math.max(1, Math.floor(sh * 0.35)); // 上35% = リング上
+      return {
+        above: [sx, sy, sw, ah],
+        net: [sx, sy + ah, sw, sh - ah],
+      };
+    };
+    const DIFF_T = 12; // この階調差以上を「動いた画素」とみなす
+    const series = rims.map(() => ({ above: [], net: [] }));
+    const prev = rims.map(() => ({ above: null, net: null }));
 
     const origRate = video.playbackRate, origTime = video.currentTime, origMuted = video.muted;
     $("analyzeBtn").disabled = true;
     $("detectProgress").classList.add("show");
-    $("detectToast").textContent = "解析中…（動画をいったん早送りで再生します）";
+    $("detectToast").textContent = "解析中…（2倍速で再生しながらリング周辺だけを解析します）";
     candidates = [];
     $("candList").innerHTML = "";
 
+    const sampleZone = (sx, sy, sw, sh) => {
+      const scale = Math.min(1, MAXD / sw, MAXD / sh);
+      const dw = Math.max(1, Math.round(sw * scale)), dh = Math.max(1, Math.round(sh * scale));
+      cx.drawImage(video, sx, sy, sw, sh, 0, 0, dw, dh);
+      const data = cx.getImageData(0, 0, dw, dh).data;
+      const n = dw * dh;
+      const gray = new Float32Array(n);
+      for (let i = 0; i < n; i++) {
+        const p = i * 4;
+        gray[i] = 0.299 * data[p] + 0.587 * data[p + 1] + 0.114 * data[p + 2];
+      }
+      return gray;
+    };
     const sample = () => {
       const t = video.currentTime;
-      cx.drawImage(video, 0, 0, sw, sh);
       rims.forEach((r, ri) => {
-        const rx = Math.floor(r.x * sw), ry = Math.floor(r.y * sh);
-        const rw = Math.max(1, Math.floor(r.w * sw)), rh = Math.max(1, Math.floor(r.h * sh));
-        const data = cx.getImageData(rx, ry, rw, rh).data;
-        const n = rw * rh;
-        const gray = new Float32Array(n);
-        for (let i = 0; i < n; i++) {
-          const p = i * 4;
-          gray[i] = 0.299 * data[p] + 0.587 * data[p + 1] + 0.114 * data[p + 2];
+        const zones = zonesOf(r);
+        for (const zk of ["above", "net"]) {
+          const gray = sampleZone(...zones[zk]);
+          const pg = prev[ri][zk];
+          if (pg && pg.length === gray.length) {
+            let moved = 0;
+            for (let i = 0; i < gray.length; i++) if (Math.abs(gray[i] - pg[i]) > DIFF_T) moved++;
+            series[ri][zk].push({ t, score: moved / gray.length });
+          }
+          prev[ri][zk] = gray;
         }
-        if (prev[ri]) {
-          let diff = 0;
-          for (let i = 0; i < n; i++) diff += Math.abs(gray[i] - prev[ri][i]);
-          series[ri].push({ t, score: diff / n });
-        }
-        prev[ri] = gray;
       });
       const pct = video.duration ? Math.min(100, Math.round(100 * video.currentTime / video.duration)) : 0;
       $("detectProgress").firstElementChild.style.width = pct + "%";
@@ -1327,32 +1384,56 @@
   }
 
   function median(sorted) { return sorted[Math.floor(sorted.length / 2)]; }
+  // 実映像で検証したパラメータ:
+  // 動きが0.6秒を超えて続く=人の横切りとして除外 / リング上→ネットは0.7秒以内 /
+  // 候補確定後2.0秒はネットの残り揺れを無視
+  const MAX_RUN = 0.6, SEQ_WIN = 0.7, REFRACT = 2.0;
+  function runsOf(arr, thr) {
+    // サンプル間隔が0.25秒以上開いたら別のrunとして扱う
+    // （フレームドロップ時にrunが不当に長くなり「人」と誤判定されるのを防ぐ）
+    const out = [];
+    let j = 0;
+    while (j < arr.length) {
+      if (arr[j].score > thr) {
+        let k2 = j + 1;
+        while (k2 < arr.length && arr[k2].score > thr && arr[k2].t - arr[k2 - 1].t < 0.25) k2++;
+        out.push({ t: arr[j].t, dur: arr[k2 - 1].t - arr[j].t });
+        j = k2;
+      } else j++;
+    }
+    return out;
+  }
+  function thrOf(arr, k, floor) {
+    const scores = arr.map(s => s.score);
+    const med = median([...scores].sort((a, b) => a - b));
+    // MAD（中央絶対偏差）: シュートのスパイク自体に引きずられにくいベースライン
+    const mad = median(scores.map(v => Math.abs(v - med)).sort((a, b) => a - b));
+    return Math.max(med + k * 1.4826 * mad, floor);
+  }
   function runDetection(series) {
     const { k, floor } = sensParams();
-    const minGap = 2.0;
     const raw = [];
-    series.forEach((arr, ri) => {
-      if (arr.length < 5) return;
-      const scores = arr.map(s => s.score);
-      const med = median([...scores].sort((a, b) => a - b));
-      // MAD（中央絶対偏差）: 得点スパイク自体に引きずられにくいベースライン
-      const mad = median(scores.map(v => Math.abs(v - med)).sort((a, b) => a - b));
-      const rsd = Math.max(1.4826 * mad, 1e-6);
-      const maxS = Math.max(...scores);
-      const thr = Math.max(med + k * rsd, floor * maxS);
-      for (let i = 0; i < arr.length; i++) {
-        if (arr[i].score > thr) raw.push({ t: arr[i].t, rim: ri, score: arr[i].score });
+    series.forEach((z, ri) => {
+      if (z.above.length < 5 || z.net.length < 5) return;
+      const runsA = runsOf(z.above, thrOf(z.above, k, floor));
+      const runsN = runsOf(z.net, thrOf(z.net, k, floor));
+      for (const ra of runsA) {
+        if (ra.dur > MAX_RUN) continue; // 人の横切り
+        for (const rn of runsN) {
+          if (rn.dur > MAX_RUN) continue;
+          const gap = rn.t - ra.t;
+          if (gap >= 0 && gap <= SEQ_WIN) {
+            raw.push({ t: ra.t, rim: ri });
+            break;
+          }
+        }
       }
     });
     raw.sort((a, b) => a.t - b.t);
     const out = [];
     for (const c of raw) {
-      const last = out[out.length - 1];
-      if (last && c.t - last.t < minGap) {
-        if (c.score > last.score) out[out.length - 1] = c;
-      } else {
-        out.push(c);
-      }
+      if (out.length && c.t - out[out.length - 1].t < REFRACT) continue;
+      out.push(c);
     }
     candidates = out;
     renderCandidates();
@@ -1363,25 +1444,28 @@
     list.innerHTML = "";
     if (!lastSeries) return;
     if (!candidates.length) {
-      $("detectToast").textContent = "得点らしき動きは見つかりませんでした。感度を上げて再解析するか、リング枠の位置・大きさを調整してみてください。";
+      $("detectToast").textContent = "シュートらしき動きは見つかりませんでした。感度を上げて再調整するか、リング枠を「リング+ネット全体」が収まるように引き直してみてください。";
       return;
     }
-    $("detectToast").textContent = candidates.length + "件の候補が見つかりました。各候補を再生して確認し、得点なら選手と種別を選んで確定してください。";
+    $("detectToast").textContent = candidates.length + "件のシュート候補が見つかりました。▶で確認して、選手と結果（成功/失敗）を確定してください。";
     const players = state.players;
     const opts = players.map(p => '<option value="' + p.id + '">' + esc(playerLabel(p)) + "</option>").join("");
+    const kinds = '<option value="p2m">2P成功</option><option value="p3m">3P成功</option>' +
+      '<option value="ftm">FT成功</option><option value="p2x">2P失敗</option>' +
+      '<option value="p3x">3P失敗</option><option value="ftx">FT失敗</option>';
     candidates.forEach((c) => {
       const li = document.createElement("li");
       li.className = "cand";
       li.innerHTML =
         '<div class="cand-head">' +
           '<button type="button" class="ct">▶ ' + fmtTime(c.t) + "</button>" +
-          '<span style="color:var(--sub);font-size:.85rem">リング' + (c.rim + 1) + " 付近で得点らしき動き</span>" +
+          '<span style="color:var(--sub);font-size:.85rem">リング' + (c.rim + 1) + " にシュートらしき動き（リング上→ネット）</span>" +
         "</div>" +
         '<div class="cand-confirm">' +
           (players.length
             ? '<select class="cp">' + opts + "</select>" +
-              '<select class="ck"><option value="p2m">2P</option><option value="p3m">3P</option><option value="ftm">FT</option></select>' +
-              '<button type="button" class="btn confirm">得点として記録</button>'
+              '<select class="ck">' + kinds + "</select>" +
+              '<button type="button" class="btn confirm">記録する</button>'
             : '<span style="color:var(--sub);font-size:.83rem">先に選手を登録すると確定できます</span>') +
           '<button type="button" class="btn ghost dismiss">除外</button>' +
         "</div>";
@@ -1396,7 +1480,7 @@
         candidates = candidates.filter(x => x !== c);
         renderCandidates();
         renderBox(); renderScoreChart(); renderStatChart(); renderTimeline(); renderLog();
-        $("detectToast").textContent = "得点を記録しました（残り候補 " + candidates.length + "件）。";
+        $("detectToast").textContent = "記録しました（残り候補 " + candidates.length + "件）。";
       });
       li.querySelector(".dismiss").addEventListener("click", () => {
         candidates = candidates.filter(x => x !== c);
