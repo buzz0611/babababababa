@@ -420,7 +420,15 @@
   .progress.show { display: block; }
   .progress > i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .1s linear; }
   .cand-list { list-style: none; display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
-  .cand { border: 1px solid var(--bar-bg); border-radius: 10px; padding: 10px 12px; }
+  .cand { border: 1px solid var(--bar-bg); border-radius: 10px; padding: 10px 12px; display: flex; gap: 12px; align-items: flex-start; }
+  .cand .thumb {
+    width: 104px; height: 78px;
+    border-radius: 8px;
+    background: var(--chip);
+    object-fit: cover;
+    flex: none;
+  }
+  .cand .cbody { flex: 1; min-width: 0; }
   .cand-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
   .cand-head .ct {
     background: var(--chip); border: none; border-radius: 6px;
@@ -522,6 +530,7 @@
     </div>
     <div class="progress" id="detectProgress"><i></i></div>
     <p class="toast" id="detectToast" role="status" aria-live="polite">まず上で動画を読み込んでください。</p>
+    <div style="margin:4px 0"><button class="btn ghost" type="button" id="dismissAll" hidden>すべて除外</button></div>
     <ul class="cand-list" id="candList"></ul>
   </section>
 
@@ -1166,6 +1175,7 @@
   let rimSetting = false;
   let candidates = [];
   let lastSeries = null;
+  let lastRims = null;
 
   function videoReady() {
     return video.classList.contains("loaded") && video.videoWidth > 0;
@@ -1257,6 +1267,13 @@
   });
 
   $("sensRange").addEventListener("change", () => { if (lastSeries) runDetection(lastSeries); });
+  $("dismissAll").addEventListener("click", () => {
+    if (!candidates.length) return;
+    if (!confirm(candidates.length + "件の候補をすべて除外しますか？")) return;
+    candidates = [];
+    renderCandidates();
+    $("detectToast").textContent = "候補をすべて除外しました。感度を下げて再調整もできます。";
+  });
   function sensParams() {
     const v = parseInt($("sensRange").value, 10) || 3;
     // k: 中央値+MAD基準の外れ幅 / floor: 動いた画素割合の下限（実映像で調整済み）
@@ -1380,6 +1397,7 @@
     $("detectProgress").classList.remove("show");
     $("analyzeBtn").disabled = false;
     lastSeries = series;
+    lastRims = rims;
     runDetection(series);
   }
 
@@ -1396,8 +1414,12 @@
     while (j < arr.length) {
       if (arr[j].score > thr) {
         let k2 = j + 1;
-        while (k2 < arr.length && arr[k2].score > thr && arr[k2].t - arr[k2 - 1].t < 0.25) k2++;
-        out.push({ t: arr[j].t, dur: arr[k2 - 1].t - arr[j].t });
+        let peak = arr[j].score;
+        while (k2 < arr.length && arr[k2].score > thr && arr[k2].t - arr[k2 - 1].t < 0.25) {
+          peak = Math.max(peak, arr[k2].score);
+          k2++;
+        }
+        out.push({ t: arr[j].t, dur: arr[k2 - 1].t - arr[j].t, peak });
         j = k2;
       } else j++;
     }
@@ -1412,15 +1434,27 @@
   }
   function runDetection(series) {
     const { k, floor } = sensParams();
+    const vw = video.videoWidth || 1920;
+    const vh = video.videoHeight || 1080;
     const raw = [];
     series.forEach((z, ri) => {
       if (z.above.length < 5 || z.net.length < 5) return;
-      const runsA = runsOf(z.above, thrOf(z.above, k, floor));
-      const runsN = runsOf(z.net, thrOf(z.net, k, floor));
+      // ボールサイズの上限ゲート: 枠幅からボールの見かけサイズを推定し、
+      // それより明らかに大きい動き(体・複数人)はボールではないとみなす
+      const r = (lastRims || state.rims)[ri];
+      let capA = 0.45, capN = 0.45;
+      if (r) {
+        const boxW = r.w * vw, boxH = r.h * vh;
+        const ballArea = Math.PI * Math.pow(0.21 * boxW, 2); // ボール直径≈枠幅の42%
+        capA = Math.min(0.45, 4 * ballArea / Math.max(boxW * boxH * 0.35, 1));
+        capN = Math.min(0.45, 4 * ballArea / Math.max(boxW * boxH * 0.65, 1));
+      }
+      const runsA = runsOf(z.above, thrOf(z.above, k, floor))
+        .filter(x => x.dur <= MAX_RUN && x.peak <= capA);
+      const runsN = runsOf(z.net, thrOf(z.net, k, floor))
+        .filter(x => x.dur <= MAX_RUN && x.peak <= capN);
       for (const ra of runsA) {
-        if (ra.dur > MAX_RUN) continue; // 人の横切り
         for (const rn of runsN) {
-          if (rn.dur > MAX_RUN) continue;
           const gap = rn.t - ra.t;
           if (gap >= 0 && gap <= SEQ_WIN) {
             raw.push({ t: ra.t, rim: ri });
@@ -1433,15 +1467,57 @@
     const out = [];
     for (const c of raw) {
       if (out.length && c.t - out[out.length - 1].t < REFRACT) continue;
+      c.id = uid();
       out.push(c);
     }
     candidates = out;
     renderCandidates();
+    captureThumbs(candidates);
+  }
+
+  // 候補ごとのサムネイル（リング周辺を切り出し）— 一目でボールかどうか判別できるように
+  let thumbToken = 0;
+  function seekTo(t) {
+    return new Promise((resolve) => {
+      const done = () => { video.removeEventListener("seeked", done); resolve(); };
+      video.addEventListener("seeked", done);
+      video.currentTime = t;
+      setTimeout(done, 1500); // 保険
+    });
+  }
+  async function captureThumbs(list) {
+    if (!videoReady() || !video.paused || !list.length) return;
+    const token = ++thumbToken;
+    const orig = video.currentTime;
+    const vw = video.videoWidth, vh = video.videoHeight;
+    const canvas = document.createElement("canvas");
+    canvas.width = 208; canvas.height = 156;
+    const tcx = canvas.getContext("2d");
+    for (const c of list.slice(0, 60)) {
+      if (token !== thumbToken) return;
+      const r = (lastRims || state.rims)[c.rim];
+      if (!r) continue;
+      await seekTo(c.t);
+      if (token !== thumbToken) return;
+      let w = Math.max(r.w * vw * 3, 200), h = w * 0.75;
+      let sx = (r.x + r.w / 2) * vw - w / 2, sy = (r.y + r.h / 2) * vh - h / 2;
+      sx = Math.min(Math.max(sx, 0), Math.max(vw - w, 0));
+      sy = Math.min(Math.max(sy, 0), Math.max(vh - h, 0));
+      w = Math.min(w, vw); h = Math.min(h, vh);
+      try {
+        tcx.drawImage(video, sx, sy, w, h, 0, 0, canvas.width, canvas.height);
+        c.thumb = canvas.toDataURL("image/jpeg", 0.7);
+        const img = document.getElementById("thumb-" + c.id);
+        if (img) { img.src = c.thumb; }
+      } catch (e) { /* 描画に失敗したらサムネイルなしで続行 */ }
+    }
+    if (token === thumbToken) await seekTo(orig);
   }
 
   function renderCandidates() {
     const list = $("candList");
     list.innerHTML = "";
+    $("dismissAll").hidden = candidates.length < 2;
     if (!lastSeries) return;
     if (!candidates.length) {
       $("detectToast").textContent = "シュートらしき動きは見つかりませんでした。感度を上げて再調整するか、リング枠を「リング+ネット全体」が収まるように引き直してみてください。";
@@ -1457,9 +1533,12 @@
       const li = document.createElement("li");
       li.className = "cand";
       li.innerHTML =
+        '<img class="thumb" id="thumb-' + c.id + '" alt="候補のリング周辺" ' +
+          (c.thumb ? 'src="' + c.thumb + '"' : "") + ">" +
+        '<div class="cbody">' +
         '<div class="cand-head">' +
           '<button type="button" class="ct">▶ ' + fmtTime(c.t) + "</button>" +
-          '<span style="color:var(--sub);font-size:.85rem">リング' + (c.rim + 1) + " にシュートらしき動き（リング上→ネット）</span>" +
+          '<span style="color:var(--sub);font-size:.85rem">リング' + (c.rim + 1) + " にシュートらしき動き</span>" +
         "</div>" +
         '<div class="cand-confirm">' +
           (players.length
@@ -1468,7 +1547,7 @@
               '<button type="button" class="btn confirm">記録する</button>'
             : '<span style="color:var(--sub);font-size:.83rem">先に選手を登録すると確定できます</span>') +
           '<button type="button" class="btn ghost dismiss">除外</button>' +
-        "</div>";
+        "</div></div>";
       li.querySelector(".ct").addEventListener("click", () => {
         if (!videoReady()) return;
         video.currentTime = Math.max(0, c.t - 3);
