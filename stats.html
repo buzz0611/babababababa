@@ -1402,10 +1402,10 @@
   }
 
   function median(sorted) { return sorted[Math.floor(sorted.length / 2)]; }
-  // 実映像で検証したパラメータ:
-  // 動きが0.6秒を超えて続く=人の横切りとして除外 / リング上→ネットは0.7秒以内 /
-  // 候補確定後2.0秒はネットの残り揺れを無視
-  const MAX_RUN = 0.6, SEQ_WIN = 0.7, REFRACT = 2.0;
+  // 実映像2本(直接撮影+YouTube画面録画)で検証したパラメータ:
+  // 動きが0.6秒を超えて続く=人の横切りとして除外 / リング上→ネットは0.05〜0.7秒
+  // (同時発火=圧縮ノイズのパルスは除外) / 近接1.2秒以内は最も強い候補のみ残す
+  const MAX_RUN = 0.6, MIN_GAP = 0.05, SEQ_WIN = 0.7, NMS_WIN = 1.2;
   function runsOf(arr, thr) {
     // サンプル間隔が0.25秒以上開いたら別のrunとして扱う
     // （フレームドロップ時にrunが不当に長くなり「人」と誤判定されるのを防ぐ）
@@ -1426,11 +1426,14 @@
     return out;
   }
   function thrOf(arr, k, floor) {
-    const scores = arr.map(s => s.score);
-    const med = median([...scores].sort((a, b) => a - b));
+    const sorted = arr.map(s => s.score).sort((a, b) => a - b);
+    const med = median(sorted);
     // MAD（中央絶対偏差）: シュートのスパイク自体に引きずられにくいベースライン
-    const mad = median(scores.map(v => Math.abs(v - med)).sort((a, b) => a - b));
-    return Math.max(med + k * 1.4826 * mad, floor);
+    const mad = median(sorted.map(v => Math.abs(v - med)).sort((a, b) => a - b));
+    // P75×3: 圧縮ノイズの「揺らぎ」が常時あるざらついた映像(画面録画など)では
+    // その揺らぎの上端より十分上を要求する適応ノイズ床
+    const p75 = sorted[Math.floor(sorted.length * 0.75)];
+    return Math.max(med + k * 1.4826 * mad, floor, p75 * 3.0);
   }
   function runDetection(series) {
     const { k, floor } = sensParams();
@@ -1456,20 +1459,23 @@
       for (const ra of runsA) {
         for (const rn of runsN) {
           const gap = rn.t - ra.t;
-          if (gap >= 0 && gap <= SEQ_WIN) {
-            raw.push({ t: ra.t, rim: ri });
+          if (gap >= MIN_GAP && gap <= SEQ_WIN) {
+            raw.push({ t: ra.t, rim: ri, strength: ra.peak + rn.peak });
             break;
           }
         }
       }
     });
-    raw.sort((a, b) => a.t - b.t);
+    // NMS: 強い候補から採用し、その前後1.2秒の弱い候補は抑制
+    // （弱いノイズ候補が本物のシュートを握りつぶさないように）
+    raw.sort((a, b) => b.strength - a.strength);
     const out = [];
     for (const c of raw) {
-      if (out.length && c.t - out[out.length - 1].t < REFRACT) continue;
+      if (out.some(a => Math.abs(c.t - a.t) < NMS_WIN)) continue;
       c.id = uid();
       out.push(c);
     }
+    out.sort((a, b) => a.t - b.t);
     candidates = out;
     renderCandidates();
     captureThumbs(candidates);
