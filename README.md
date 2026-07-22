@@ -46,3 +46,12 @@ open index.html        # macOS
 
 - 依存ライブラリなしの単一HTMLファイル（HTML / CSS / Vanilla JS）
 - コート図はSVGで描画
+
+## 🎥 おまけ: バスケ試合動画の選手を「色分け＆追跡」する（YOLO + SAM2）
+
+note記事「[バスケの試合動画をAIに見せたら、選手が勝手に色分け＆追跡された](https://note.com/hirosuke_0520/n/n85d57196fffd)」を
+再現する Google Colab ノートブックを同梱しています。
+
+- ファイル: [`basketball_player_tracking_colab.ipynb`](./basketball_player_tracking_colab.ipynb)
+- 内容: 試合動画をアップロードすると、**YOLO11で選手検出 → ByteTrackでID追跡 → ユニフォーム色でチーム色分け → SAM2で個人の精密追跡** を行い、注釈付き動画を書き出します。
+- Google Colab で開き、ランタイムを **GPU (T4)** にして上から実行するだけ。無料枠 + OSSモデルのみで動くため **コスト0円** で再現できます。
