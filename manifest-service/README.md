@@ -64,13 +64,18 @@ scripts/        マイグレーション・デモデータ・ユーザー作成
 ```bash
 cd manifest-service
 npm install
-cp .env.example .env          # DATABASE_URL を自分の PostgreSQL に合わせる
-createdb manifest              # データベースを作成
+npm run db:start               # PostgreSQL の起動・DB作成・マイグレーション（何度実行しても安全）
 set -a; . ./.env; set +a
-npm run db:migrate             # テーブル作成
-npm run db:seed                # （任意）デモデータ。admin / admin1234 でログイン
+npm run db:seed                # （任意）デモデータ。admin / admin1234 でログイン ※既存データは消えます
 npm run dev                    # http://localhost:3000
 ```
+
+`db:start` は `.env` がなければ `.env.example` からコピーし、`DATABASE_URL`（既定はポート5433）の PostgreSQL が
+動いていなければ、ローカルの PostgreSQL（`initdb` / `pg_ctl`）で開発用クラスタを作って起動します。
+既存の PostgreSQL を使う場合は `.env` の `DATABASE_URL` を書き換えてください。
+
+Claude Code のクラウドセッションでは、`.claude/hooks/session-start.sh` がセッション開始時に
+`npm install` と `db:start` を自動で実行します。
 
 デモデータを入れない場合は、初回アクセス時に管理者アカウントの作成画面が表示されます。
 パスワードを忘れたときは `npm run user:create -- <ログインID> <新パスワード> admin` で再設定できます。
