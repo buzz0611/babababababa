@@ -23,7 +23,7 @@ export async function ManifestForm({ m }: { m?: Manifest }) {
           <label><span className="req">区分</span>
             <select name="medium" defaultValue={medium}><option value="paper">紙マニフェスト</option><option value="electronic">電子マニフェスト</option></select>
           </label>
-          <label><span className="req">交付番号／登録番号</span><input name="manifestNo" defaultValue={v('manifestNo')} required /></label>
+          <label><span className="req">交付番号／登録番号</span><input name="manifestNo" defaultValue={v('manifestNo')} required inputMode="numeric" placeholder="紙は11桁（例：30123001016）" /></label>
           <label><span className="req">交付年月日／引渡し日</span><input type="date" name="issueDate" defaultValue={(v('issueDate') as string) || todayJst()} required /></label>
           <label><span className="req">処分事業場（自社）</span>
             <select name="facilityId" defaultValue={v('facilityId')} required>

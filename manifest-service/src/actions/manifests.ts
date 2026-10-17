@@ -7,6 +7,7 @@ import { requireAdmin, requireUser } from '@/lib/auth';
 import { findClosedYear } from '@/lib/data';
 import { todayJst } from '@/lib/domain/dates';
 import { bool, optDate, optInt, optNum, str, withMsg } from '@/lib/form';
+import { checkManifestNo, normalizeManifestNo } from '@/lib/domain/manifest-no';
 import { buildManifestPayload } from '@/lib/jwnet/build';
 import { validatePayload } from '@/lib/jwnet/payload';
 
@@ -20,7 +21,7 @@ function readManifest(fd: FormData) {
   return {
     facilityId: optInt(fd, 'facilityId'),
     medium,
-    manifestNo: str(fd, 'manifestNo'),
+    manifestNo: normalizeManifestNo(str(fd, 'manifestNo')),
     issueDate: optDate(fd, 'issueDate'),
     emitterId: optInt(fd, 'emitterId'),
     emitterSiteId: optInt(fd, 'emitterSiteId'),
@@ -51,6 +52,8 @@ function readManifest(fd: FormData) {
 function validate(v: ReturnType<typeof readManifest>): string | null {
   if (!v.facilityId) return '処分事業場を選んでください';
   if (!v.manifestNo) return v.medium === 'paper' ? '交付番号を入力してください' : '登録番号を入力してください';
+  const noErr = checkManifestNo(v.manifestNo, v.medium);
+  if (noErr) return noErr;
   if (!v.issueDate) return '交付年月日（引渡し日）を入力してください';
   if (!v.emitterId) return '排出事業者を選んでください';
   if (!v.wasteType) return '廃棄物の種類を選んでください';

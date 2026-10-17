@@ -59,7 +59,9 @@ export function readImportRows(text: string): { rows: ImportRow[]; errors: strin
     for (const k of Object.keys(idx) as (keyof ImportRow)[]) o[k] = idx[k] >= 0 ? (r[idx[k]] ?? '').trim() : '';
     o.issueDate = o.issueDate.replace(/\//g, '-').replace(/-(\d)(?=-|$)/g, '-0$1');
     if (!/^\d{4}-\d{2}-\d{2}$/.test(o.issueDate)) errors.push(`${i + 2}行目：日付「${o.issueDate}」を読めません`);
+    o.manifestNo = o.manifestNo.replace(/[\s\-]/g, '');
     if (!o.manifestNo) errors.push(`${i + 2}行目：登録番号がありません`);
+    else if (!/^\d+$/.test(o.manifestNo)) errors.push(`${i + 2}行目：登録番号「${o.manifestNo}」は数字ではありません`);
     return o;
   });
   return { rows, errors };

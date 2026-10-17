@@ -7,6 +7,7 @@ import { requireAdmin, requireUser } from '@/lib/auth';
 import { findClosedYear } from '@/lib/data';
 import { todayJst } from '@/lib/domain/dates';
 import { bool, optDate, optInt, optNum, str, withMsg } from '@/lib/form';
+import { checkManifestNo, normalizeManifestNo } from '@/lib/domain/manifest-no';
 import { buildSecondaryPayload } from '@/lib/jwnet/build';
 import { validatePayload } from '@/lib/jwnet/payload';
 
@@ -16,7 +17,7 @@ function readSecondary(fd: FormData) {
   return {
     facilityId: optInt(fd, 'facilityId'),
     medium: str(fd, 'medium') === 'electronic' ? 'electronic' as const : 'paper' as const,
-    manifestNo: str(fd, 'manifestNo'),
+    manifestNo: normalizeManifestNo(str(fd, 'manifestNo')),
     issueDate: optDate(fd, 'issueDate'),
     registeredDate: optDate(fd, 'registeredDate'),
     wasteType: str(fd, 'wasteType'),
@@ -78,6 +79,7 @@ export async function saveSecondary(fd: FormData) {
   const links = readLinks(fd);
   const err = !v.facilityId ? '処分事業場を選んでください'
     : !v.manifestNo ? '交付番号（登録番号）を入力してください'
+      : checkManifestNo(v.manifestNo, v.medium) ? checkManifestNo(v.manifestNo, v.medium)!
       : !v.issueDate ? '交付日（引渡し日）を入力してください'
         : !v.wasteType ? '処分後物の種類を選んでください'
           : v.qtyT == null ? '持出量を入力してください'

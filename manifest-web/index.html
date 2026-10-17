@@ -152,6 +152,16 @@ const MEDIUM = { paper: '紙', electronic: '電子' };
 // 祝日（2024〜2030年、内閣府の祝日データより）
 const HOLIDAYS = new Set('240101,240108,240211,240212,240223,240320,240429,240503,240504,240505,240506,240715,240811,240812,240916,240922,240923,241014,241103,241104,241123,250101,250113,250211,250223,250224,250320,250429,250503,250504,250505,250506,250721,250811,250915,250923,251013,251103,251123,251124,260101,260112,260211,260223,260320,260429,260503,260504,260505,260506,260720,260811,260921,260922,260923,261012,261103,261123,270101,270111,270211,270223,270321,270322,270429,270503,270504,270505,270719,270811,270920,270923,271011,271103,271123,280101,280110,280211,280223,280320,280321,280429,280503,280504,280505,280717,280811,280918,280922,281009,281103,281123,290101,290108,290211,290212,290223,290320,290430,290503,290504,290505,290716,290811,290813,290917,290923,290924,291008,291103,291123,300101,300114,300211,300223,300320,300429,300503,300504,300505,300506,300715,300811,300916,300923,301014,301103,301104,301123'.split(','));
 
+// ===== 交付番号 =====
+// 紙マニフェストの交付番号は11桁で、末尾はチェックデジット（先頭10桁を7で割った余り）
+const normNo = (v) => String(v || '').replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).replace(/[\s\-ー－‐]/g, '');
+function checkNo(no, medium) {
+  if (medium === 'electronic') return /^\d+$/.test(no) ? '' : '登録番号は数字だけで入力してください';
+  if (!/^\d{11}$/.test(no)) return `交付番号は11桁の数字で入力してください（いまは${no.length}文字です）`;
+  const c = Number(no.slice(0, 10)) % 7;
+  return Number(no[10]) === c ? '' : `交付番号の末尾（チェックデジット）が合いません。先頭10桁から計算すると末尾は「${c}」になります。番号を見直してください`;
+}
+
 // ===== 日付 =====
 const pd = (s) => { const [y, m, d] = s.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d)); };
 const fd = (d) => d.toISOString().slice(0, 10);
@@ -300,7 +310,7 @@ const facOpts = () => S.facilities.map((f) => [f.id, f.name]);
 const M_FORM = [
   { g: 'マニフェスト', f: [
     { k: 'medium', l: '区分', t: 'select', o: [['paper', '紙マニフェスト'], ['electronic', '電子マニフェスト']], req: true, def: 'paper' },
-    { k: 'manifestNo', l: '交付番号／登録番号', req: true },
+    { k: 'manifestNo', l: '交付番号／登録番号', req: true, ph: '紙は11桁（例：30123001016）' },
     { k: 'issueDate', l: '交付年月日／引渡し日', t: 'date', req: true },
     { k: 'facilityId', l: '処分事業場（自社）', t: 'select', o: facOpts, req: true },
   ] },
@@ -341,7 +351,7 @@ const M_FORM = [
 const S_FORM = [
   { g: 'マニフェスト（自社が排出事業者として交付）', f: [
     { k: 'medium', l: '区分', t: 'select', o: [['paper', '紙マニフェスト'], ['electronic', '電子マニフェスト']], req: true, def: 'paper' },
-    { k: 'manifestNo', l: '交付番号／登録番号', req: true },
+    { k: 'manifestNo', l: '交付番号／登録番号', req: true, ph: '紙は11桁（例：50123005015）' },
     { k: 'issueDate', l: '交付日／引渡し日', t: 'date', req: true },
     { k: 'registeredDate', l: '電子：JWNET登録日', t: 'date' },
     { k: 'facilityId', l: '排出事業場（自社の処分事業場）', t: 'select', o: facOpts, req: true },
@@ -466,6 +476,7 @@ function openManifest(id) {
     });
     r.querySelector('#save').onclick = async () => {
       const v = readForm(r, M_FORM);
+      v.manifestNo = normNo(v.manifestNo);
       if (v.wasteType.startsWith('【特管】')) v.special = true;
       const err = validateManifest(v, id);
       if (err) { r.querySelector('#err').textContent = err; return; }
@@ -480,6 +491,8 @@ function openManifest(id) {
 }
 function validateManifest(v, id) {
   if (!v.manifestNo) return v.medium === 'paper' ? '交付番号を入力してください' : '登録番号を入力してください';
+  const noErr = checkNo(v.manifestNo, v.medium);
+  if (noErr) return noErr;
   if (!v.issueDate) return '交付年月日（引渡し日）を入力してください';
   if (!v.facilityId) return '処分事業場を選んでください';
   if (!v.emitterId) return '排出事業者を選んでください';
@@ -538,12 +551,13 @@ function openSecondary(id, fromManifest) {
     if (id) armDelete(r.querySelector('#del'), () => del('secondaries', id));
     r.querySelector('#save').onclick = async () => {
       const v = readForm(r, S_FORM);
+      v.manifestNo = normNo(v.manifestNo);
       if (v.wasteType.startsWith('【特管】')) v.special = true;
       v.links = [...r.querySelectorAll('[data-link]')].filter((c) => c.checked).map((c) => {
         const a = r.querySelector(`[data-alloc="${c.dataset.link}"]`).value.trim();
         return { manifestId: c.dataset.link, qtyT: a === '' ? null : Number(a) };
       });
-      const err = !v.manifestNo ? '交付番号（登録番号）を入力してください' : !v.issueDate ? '交付日を入力してください' : !v.facilityId ? '処分事業場を選んでください'
+      const err = !v.manifestNo ? '交付番号（登録番号）を入力してください' : checkNo(v.manifestNo, v.medium) ? checkNo(v.manifestNo, v.medium) : !v.issueDate ? '交付日を入力してください' : !v.facilityId ? '処分事業場を選んでください'
         : !v.wasteType ? '処分後物の種類を選んでください' : v.qtyT == null || Number.isNaN(v.qtyT) ? '持出量を数字で入力してください' : !v.disposerId ? '委託先の処分業者を選んでください'
         : v.eDate && !v.finalDisposalPlace ? 'E票を受領したら最終処分の場所も入力してください'
         : v.links.some((l) => Number.isNaN(l.qtyT)) ? '按分量は数字で入力してください'
@@ -681,7 +695,7 @@ function viewManifests() {
     </div>
     ${rows.length ? `<div class="tw"><table><thead><tr><th>区分</th><th>番号</th><th>交付日</th><th>排出事業者</th><th>種類</th><th>受入日</th><th class="num">受入量</th><th>処分</th><th>手続き</th></tr></thead><tbody>
       ${rows.map(({ m, ts }) => `<tr class="click" data-open="m:${m.id}">
-        <td><span class="tag ${m.medium === 'electronic' ? 'info' : ''}">${MEDIUM[m.medium]}</span></td><td>${esc(m.manifestNo)}</td><td class="nw">${jp(m.issueDate)}</td>
+        <td><span class="tag ${m.medium === 'electronic' ? 'info' : ''}">${MEDIUM[m.medium]}</span></td><td>${esc(m.manifestNo)}${checkNo(m.manifestNo, m.medium) ? '<div><span class="tag warn">番号を確認</span></div>' : ''}</td><td class="nw">${jp(m.issueDate)}</td>
         <td>${esc(pname(m.emitterId))}${m.emitterSite ? `<div class="muted">${esc(m.emitterSite)}</div>` : ''}</td>
         <td>${m.special ? '<span class="tag bad">特管</span> ' : ''}${esc(m.wasteType)}</td><td class="nw">${jp(m.receivedDate) || '—'}</td><td class="num">${q3(m.receivedQtyT)}</td>
         <td class="nw">${m.disposalEndDate ? `${esc(m.disposalMethod)}<div class="muted">${jp(m.disposalEndDate)} 終了</div>` : m.receivedDate ? '<span class="tag info">処分中</span>' : '<span class="tag">未受入</span>'}</td>
@@ -702,7 +716,7 @@ function viewSecondary() {
     </div>
     ${rows.length ? `<div class="tw"><table><thead><tr><th>区分</th><th>番号</th><th>交付日</th><th>種類</th><th class="num">持出量</th><th>委託先</th><th>紐付く受託</th><th>返送状況</th></tr></thead><tbody>
       ${rows.map((s) => `<tr class="click" data-open="s:${s.id}"><td><span class="tag ${s.medium === 'electronic' ? 'info' : ''}">${MEDIUM[s.medium]}</span></td>
-        <td>${esc(s.manifestNo)}</td><td class="nw">${jp(s.issueDate)}</td><td>${esc(s.wasteType)}</td><td class="num">${q3(s.qtyT)}</td>
+        <td>${esc(s.manifestNo)}${checkNo(s.manifestNo, s.medium) ? '<div><span class="tag warn">番号を確認</span></div>' : ''}</td><td class="nw">${jp(s.issueDate)}</td><td>${esc(s.wasteType)}</td><td class="num">${q3(s.qtyT)}</td>
         <td>${esc(pname(s.disposerId))}<div class="muted">${esc(s.destAddress)}</div></td><td class="num">${(s.links || []).length}件</td><td>${taskTags(secondaryTasks(s, t))}</td></tr>`).join('')}
     </tbody></table></div>` : `<div class="empty">${S.secondaries.length ? '条件に合うものはありません' : '処分後物を委託したら、ここで二次マニフェストを登録します。'}</div>`}
   </div>`;
