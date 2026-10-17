@@ -28,7 +28,7 @@ if ! pg_isready -q -h 127.0.0.1 -p "$PORT" 2>/dev/null; then
     mkdir -p "$PGDATA_DIR"
   fi
   if [ ! -f "$PGDATA_DIR/PG_VERSION" ]; then
-    run "'$BIN/initdb' -D '$PGDATA_DIR' -U postgres --auth=trust -E UTF8 --locale=C.UTF-8" >/dev/null
+    run "'$BIN/initdb' -D '$PGDATA_DIR' -U postgres --auth=trust -E UTF8 --no-locale" >/dev/null
   fi
   run "'$BIN/pg_ctl' -D '$PGDATA_DIR' -l '$PGDATA_DIR/server.log' -o '-p $PORT -k /tmp' -w start" >/dev/null
   echo "PostgreSQL を起動しました（ポート $PORT, データ $PGDATA_DIR）"
