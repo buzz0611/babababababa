@@ -1,0 +1,872 @@
+<title>処分マニフェスト帳簿</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&display=swap">
+<style>
+/* レイアウト：上部の固定タブ＋業務画面。一覧は表、編集はダイアログ */
+:root {
+  --bg: #f2f4f3;
+  --surface: #ffffff;
+  --ink: #17211d;
+  --sub: #5a6762;
+  --line: #d8dfdb;
+  --chip: #e8eeeb;
+  --accent: #1f6b58;
+  --accent-ink: #ffffff;
+  --ok: #24704f;  --ok-bg: #e1f1e8;
+  --warn: #8a5a00; --warn-bg: #fbefd2;
+  --bad: #b02a22;  --bad-bg: #fae3e0;
+  --info: #285c9a; --info-bg: #e2ebf7;
+  --shadow: 0 1px 2px rgba(23,33,29,.06), 0 4px 14px rgba(23,33,29,.06);
+  --font: "BIZ UDPGothic", "Hiragino Sans", "Yu Gothic UI", "Meiryo", sans-serif;
+  --r: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111715; --surface: #1a211e; --ink: #e2eae6; --sub: #93a29b; --line: #2e3934; --chip: #24302b;
+    --accent: #5cc2a3; --accent-ink: #0c1e18;
+    --ok: #74d3a3; --ok-bg: #18342a; --warn: #f0c066; --warn-bg: #3a2f16; --bad: #ff8f84; --bad-bg: #3d1e1b; --info: #8fb6f2; --info-bg: #1b2a3e;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 4px 14px rgba(0,0,0,.3);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111715; --surface: #1a211e; --ink: #e2eae6; --sub: #93a29b; --line: #2e3934; --chip: #24302b;
+  --accent: #5cc2a3; --accent-ink: #0c1e18;
+  --ok: #74d3a3; --ok-bg: #18342a; --warn: #f0c066; --warn-bg: #3a2f16; --bad: #ff8f84; --bad-bg: #3d1e1b; --info: #8fb6f2; --info-bg: #1b2a3e;
+  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 4px 14px rgba(0,0,0,.3);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 14.5px; line-height: 1.6; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--surface); }
+.wrap { max-width: 1240px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+header.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 9; background: var(--surface); border-bottom: 1px solid var(--line); }
+header.top .wrap { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding-block: 8px; }
+.brand { font-weight: 700; font-size: 16px; white-space: nowrap; display: flex; align-items: center; gap: 8px; }
+.brand svg { flex: none; }
+nav.tabs { display: flex; gap: 2px; flex-wrap: wrap; }
+nav.tabs button { border: 0; background: none; color: var(--sub); font: inherit; padding: 5px 11px; border-radius: 7px; cursor: pointer; }
+nav.tabs button[aria-selected="true"] { background: var(--chip); color: var(--ink); font-weight: 700; }
+.mode { margin-left: auto; font-size: 12px; color: var(--sub); }
+main { padding-block: 18px 60px; display: grid; gap: 16px; }
+h1 { font-size: 19px; margin: 0; text-wrap: balance; }
+h2 { font-size: 16px; margin: 0 0 10px; }
+h3 { font-size: 14px; margin: 14px 0 6px; }
+.card { background: var(--surface); border-radius: var(--r); box-shadow: var(--shadow); padding: 16px; min-width: 0; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.spacer { flex: 1; }
+.muted { color: var(--sub); font-size: 13px; }
+.stats { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+.stat { background: var(--surface); border-radius: var(--r); box-shadow: var(--shadow); padding: 12px 16px; border-left: 4px solid var(--line); }
+.stat .n { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.stat .l { color: var(--sub); font-size: 13px; }
+.stat.bad { border-left-color: var(--bad); } .stat.bad .n { color: var(--bad); }
+.stat.warn { border-left-color: var(--warn); } .stat.warn .n { color: var(--warn); }
+.cols { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr)); align-items: start; }
+.btn { border: 1px solid var(--line); background: var(--surface); color: var(--ink); font: inherit; font-size: 13.5px; padding: 6px 13px; border-radius: 7px; cursor: pointer; white-space: nowrap; }
+.btn:hover { background: var(--chip); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 700; }
+.btn.danger { color: var(--bad); }
+.btn.danger.armed { background: var(--bad); border-color: var(--bad); color: #fff; }
+.btn.small { padding: 2px 9px; font-size: 12.5px; }
+.btn:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, nav.tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+input, select, textarea { font: inherit; font-size: 14px; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 7px; padding: 5px 8px; width: 100%; min-width: 0; }
+input[type="checkbox"] { width: auto; }
+textarea { min-height: 54px; }
+.form { display: grid; gap: 10px 14px; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+.form label { display: flex; flex-direction: column; gap: 2px; font-size: 12.5px; color: var(--sub); min-width: 0; }
+.form label.wide { grid-column: 1 / -1; }
+.form label.check { flex-direction: row; align-items: center; gap: 6px; color: var(--ink); font-size: 13.5px; }
+.req::after { content: " *"; color: var(--bad); }
+fieldset { border: 1px solid var(--line); border-radius: 9px; padding: 8px 14px 14px; margin: 0; min-width: 0; }
+legend { font-size: 13px; font-weight: 700; padding: 0 6px; }
+.tw { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--sub); font-weight: 700; font-size: 12px; white-space: nowrap; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+td.nw { white-space: nowrap; }
+tr.click { cursor: pointer; }
+tr.click:hover td { background: var(--chip); }
+.tag { display: inline-block; padding: 0 8px; border-radius: 999px; font-size: 12px; line-height: 20px; white-space: nowrap; background: var(--chip); color: var(--sub); }
+.tag.ok { background: var(--ok-bg); color: var(--ok); }
+.tag.warn { background: var(--warn-bg); color: var(--warn); }
+.tag.bad { background: var(--bad-bg); color: var(--bad); }
+.tag.info { background: var(--info-bg); color: var(--info); }
+.tags { display: flex; gap: 4px; flex-wrap: wrap; }
+.empty { color: var(--sub); text-align: center; padding: 22px 12px; }
+.note { background: var(--chip); border-radius: 8px; padding: 9px 13px; font-size: 13px; color: var(--sub); }
+.banner { border-radius: 8px; padding: 9px 13px; font-size: 13.5px; }
+.banner.warn { background: var(--warn-bg); color: var(--warn); }
+.banner.bad { background: var(--bad-bg); color: var(--bad); }
+.tasks { list-style: none; margin: 0; padding: 0; }
+.tasks li { display: flex; gap: 10px; align-items: center; padding: 7px 0; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.tasks .label { min-width: 180px; font-weight: 700; }
+.tasks input[type="date"] { width: 150px; padding: 2px 6px; }
+pre.payload { background: var(--chip); border-radius: 8px; padding: 10px; font-size: 12.5px; white-space: pre-wrap; margin: 6px 0 0; font-family: var(--font); }
+dialog { border: 0; border-radius: 12px; padding: 0; background: var(--surface); color: var(--ink); width: min(980px, calc(100vw - 24px)); max-height: calc(100vh - 24px); box-shadow: var(--shadow); }
+dialog::backdrop { background: rgba(0,0,0,.45); }
+.dlg { padding: 18px; display: grid; gap: 12px; }
+.dlg-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.dlg-foot { display: flex; gap: 8px; flex-wrap: wrap; position: sticky; bottom: 0; background: var(--surface); padding-top: 10px; border-top: 1px solid var(--line); }
+.err { color: var(--bad); font-size: 13.5px; }
+.toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 8px 16px; border-radius: 8px; font-size: 14px; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 20; }
+.toast.show { opacity: 1; }
+@media (max-width: 720px) { th, td { white-space: nowrap; } .mode { margin-left: 0; width: 100%; } }
+@media (prefers-reduced-motion: reduce) { .toast { transition: none; } }
+</style>
+
+<header class="top">
+  <div class="wrap">
+    <div class="brand">
+      <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="2.5" width="16" height="19" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M8 8h8M8 12h8M8 16h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      処分マニフェスト帳簿
+    </div>
+    <nav class="tabs" role="tablist" id="tabs">
+      <button role="tab" data-tab="dash">ダッシュボード</button>
+      <button role="tab" data-tab="manifests">受託マニフェスト</button>
+      <button role="tab" data-tab="secondary">二次マニフェスト</button>
+      <button role="tab" data-tab="ledger">帳簿</button>
+      <button role="tab" data-tab="masters">マスタ</button>
+    </nav>
+    <span class="mode" id="mode">接続中…</span>
+  </div>
+</header>
+
+<main class="wrap" id="view"></main>
+
+<dialog id="dlg"><div class="dlg" id="dlgBody"></div></dialog>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+'use strict';
+
+// ===== 定数 =====
+const WASTE = ['燃え殻','汚泥','廃油','廃酸','廃アルカリ','廃プラスチック類','ゴムくず','金属くず','ガラスくず・コンクリートくず及び陶磁器くず','鉱さい','がれき類','ばいじん','紙くず','木くず','繊維くず','動植物性残さ','動物系固形不要物','動物のふん尿','動物の死体','13号廃棄物','混合廃棄物','石綿含有産業廃棄物','水銀使用製品産業廃棄物',
+  '【特管】廃油（引火性）','【特管】廃酸（腐食性）','【特管】廃アルカリ（腐食性）','【特管】感染性産業廃棄物','【特管】廃石綿等','【特管】廃PCB等','【特管】特定有害産業廃棄物'];
+const METHODS = ['破砕','選別','圧縮','切断','焼却','溶融','中和','脱水','乾燥','油水分離','堆肥化','RPF化','固形燃料化','安定型埋立','管理型埋立','遮断型埋立'];
+const UNITS = ['t','kg','m3','L','個','台'];
+const MEDIUM = { paper: '紙', electronic: '電子' };
+// 祝日（2024〜2030年、内閣府の祝日データより）
+const HOLIDAYS = new Set('240101,240108,240211,240212,240223,240320,240429,240503,240504,240505,240506,240715,240811,240812,240916,240922,240923,241014,241103,241104,241123,250101,250113,250211,250223,250224,250320,250429,250503,250504,250505,250506,250721,250811,250915,250923,251013,251103,251123,251124,260101,260112,260211,260223,260320,260429,260503,260504,260505,260506,260720,260811,260921,260922,260923,261012,261103,261123,270101,270111,270211,270223,270321,270322,270429,270503,270504,270505,270719,270811,270920,270923,271011,271103,271123,280101,280110,280211,280223,280320,280321,280429,280503,280504,280505,280717,280811,280918,280922,281009,281103,281123,290101,290108,290211,290212,290223,290320,290430,290503,290504,290505,290716,290811,290813,290917,290923,290924,291008,291103,291123,300101,300114,300211,300223,300320,300429,300503,300504,300505,300506,300715,300811,300916,300923,301014,301103,301104,301123'.split(','));
+
+// ===== 日付 =====
+const pd = (s) => { const [y, m, d] = s.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d)); };
+const fd = (d) => d.toISOString().slice(0, 10);
+const addDays = (s, n) => { const d = pd(s); d.setUTCDate(d.getUTCDate() + n); return fd(d); };
+const diff = (a, b) => Math.round((pd(b) - pd(a)) / 86400000);
+const today = () => fd(new Date(Date.now() + 9 * 3600e3));
+const jp = (s) => s ? s.replace(/-/g, '/') : '';
+const isOff = (s) => { const w = pd(s).getUTCDay(); const md = s.slice(5); return w === 0 || w === 6 || md >= '12-29' || md <= '01-03' || HOLIDAYS.has(s.slice(2).replace(/-/g, '')); };
+const addBiz = (s, n) => { let c = s; while (n > 0) { c = addDays(c, 1); if (!isOff(c)) n--; } return c; };
+const fy = (s, start) => { const [y, m] = s.split('-').map(Number); return m >= start ? y : y - 1; };
+const fyRange = (y, start) => { const mm = String(start).padStart(2, '0'); return { from: `${y}-${mm}-01`, to: addDays(`${y + 1}-${mm}-01`, -1) }; };
+const monthRange = (ym) => { const [y, m] = ym.split('-').map(Number); const nx = m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, '0')}-01`; return { from: `${ym}-01`, to: addDays(nx, -1) }; };
+
+// ===== 期限計算 =====
+const RANK = { overdue: 0, soon: 1, pending: 2, waiting: 3, late_done: 4, done: 5 };
+const STATE_LABEL = { overdue: '期限超過', soon: '期限間近', pending: '対応待ち', waiting: '起点待ち', late_done: '遅延完了', done: '完了' };
+const STATE_CLS = { overdue: 'bad', soon: 'warn', pending: 'info', waiting: '', late_done: 'warn', done: 'ok' };
+function task(key, label, due, done, t, soon, waitingFor) {
+  if (done) return { key, label, due, done, state: due && done > due ? 'late_done' : 'done', left: null };
+  if (!due) return { key, label, due: null, done: null, state: 'waiting', left: null, waitingFor };
+  const left = diff(t, due);
+  return { key, label, due, done: null, state: left < 0 ? 'overdue' : left <= soon ? 'soon' : 'pending', left };
+}
+function primaryTasks(m, t) {
+  const fac = byId('facilities', m.facilityId);
+  const finalFac = !!fac?.isFinalDisposal;
+  const end = m.disposalEndDate || null;
+  const fStart = finalFac ? end : (m.finalNoticeReceivedDate || null);
+  const fWait = finalFac || !end ? '処分終了の登録待ち' : '二次委託先の最終処分終了待ち';
+  if (m.medium === 'electronic') return [
+    task('disposalReportedDate', '処分終了報告（JWNET）', end && addBiz(end, 3), m.disposalReportedDate, t, 1, '処分終了の登録待ち'),
+    task('finalReportedDate', '最終処分終了報告（JWNET）', fStart && addBiz(fStart, 3), m.finalReportedDate, t, 1, fWait),
+  ];
+  const ts = [];
+  if (m.transporterId) ts.push(task('c2SentDate', 'C2票送付（運搬業者へ）', end && addDays(end, 10), m.c2SentDate, t, 3, '処分終了の登録待ち'));
+  ts.push(task('dSentDate', 'D票送付（排出事業者へ）', end && addDays(end, 10), m.dSentDate, t, 3, '処分終了の登録待ち'));
+  ts.push(task('eSentDate', 'E票送付（排出事業者へ）', fStart && addDays(fStart, 10), m.eSentDate, t, 3, fWait));
+  return ts;
+}
+function secondaryTasks(s, t) {
+  const span = s.special ? 60 : 90, paper = s.medium !== 'electronic', ts = [];
+  if (!paper) ts.push(task('registeredDate', 'JWNET登録', addBiz(s.issueDate, 3), s.registeredDate, t, 1));
+  const c = (key, label, days) => { const x = task(key, label, addDays(s.issueDate, days), s[key], t, 14); if (x.state === 'overdue') x.report = addDays(x.due, 30); ts.push(x); };
+  c('b2Date', paper ? 'B2票（運搬終了）' : '運搬終了報告', span);
+  c('dDate', paper ? 'D票（処分終了）' : '処分終了報告', span);
+  c('eDate', paper ? 'E票（最終処分終了）' : '最終処分終了報告', 180);
+  return ts;
+}
+const worst = (ts) => ts.reduce((w, x) => RANK[x.state] < RANK[w] ? x.state : w, 'done');
+
+// ===== データ =====
+const S = { company: {}, facilities: [], partners: [], manifests: [], secondaries: [] };
+const COLLS = ['facilities', 'partners', 'manifests', 'secondaries'];
+const byId = (c, id) => S[c].find((x) => x.id === id);
+const pname = (id) => byId('partners', id)?.name || '';
+const fname = (id) => byId('facilities', id)?.name || '';
+const startMonth = () => Number(S.company.ledgerStartMonth) || 4;
+let db = null, downloads = null, mode = 'connecting';
+const LS = 'mf-proc-web-v1';
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+
+function saveLocal() { try { localStorage.setItem(LS, JSON.stringify(S)); } catch (e) {} }
+function loadLocal() { try { const j = JSON.parse(localStorage.getItem(LS) || 'null'); if (j) Object.assign(S, j); } catch (e) {} }
+
+async function put(coll, rec) {
+  const body = JSON.parse(JSON.stringify(rec));
+  if (!body.id) body.id = uid();
+  body.updatedAt = new Date().toISOString();
+  // 画面にはすぐ反映し、保存先へ書き込む（共有データは後から届く最新の内容で上書きされる）
+  const i = S[coll].findIndex((x) => x.id === body.id);
+  const prev = i >= 0 ? S[coll][i] : null;
+  if (i >= 0) S[coll][i] = body; else S[coll].push(body);
+  render();
+  if (db) {
+    try { await db.collection(coll).doc(body.id).set(body); }
+    catch (e) { S[coll] = prev ? S[coll].map((x) => x.id === body.id ? prev : x) : S[coll].filter((x) => x.id !== body.id); render(); throw e; }
+  } else saveLocal();
+  return body;
+}
+async function del(coll, id) {
+  if (db) await db.collection(coll).doc(id).delete();
+  else { S[coll] = S[coll].filter((x) => x.id !== id); saveLocal(); render(); }
+}
+async function putCompany(c) {
+  if (db) await db.doc('settings/company').set(c);
+  else { S.company = c; saveLocal(); render(); }
+}
+function dbError(e) {
+  const code = e && e.code;
+  if (code === 'invalid_argument') return '保存する権限がありません（閲覧のみで共有されています）';
+  if (code === 'quota_exceeded') return '保存できる件数の上限に達しました。不要なデータを削除してください';
+  return '保存できませんでした。通信状態を確認して、もう一度お試しください';
+}
+
+// ===== 共通UI =====
+const $ = (s, r = document) => r.querySelector(s);
+const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const q3 = (n) => n == null || n === '' ? '—' : `${Number(n).toLocaleString('ja-JP', { maximumFractionDigits: 3 })} t`;
+const r3 = (n) => Math.round(n * 1000) / 1000;
+let toastT;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2200); }
+const tagState = (st, text) => `<span class="tag ${STATE_CLS[st]}">${esc(text ?? STATE_LABEL[st])}</span>`;
+function shortTask(x) {
+  const n = x.label.replace(/（.*?）/g, '');
+  if (x.state === 'overdue') return `${n} ${-x.left}日超過`;
+  if (x.state === 'soon' || x.state === 'pending') return `${n} 〜${jp(x.due).slice(5)}`;
+  if (x.state === 'waiting') return `${n} 待ち`;
+  return x.state === 'late_done' ? `${n} 遅延済` : `${n} 済`;
+}
+const taskTags = (ts) => `<div class="tags">${ts.map((x) => tagState(x.state, shortTask(x))).join('')}</div>`;
+const opts = (list, val, blank) => (blank != null ? `<option value="">${esc(blank)}</option>` : '') + list.map((o) => {
+  const [v, l] = Array.isArray(o) ? o : [o, o];
+  return `<option value="${esc(v)}"${String(v) === String(val ?? '') ? ' selected' : ''}>${esc(l)}</option>`;
+}).join('');
+
+// ===== フォーム定義 =====
+function field(f, rec) {
+  const v = rec[f.k] ?? f.def ?? '';
+  const id = `f_${f.k}`;
+  const lab = `<span class="${f.req ? 'req' : ''}">${esc(f.l)}</span>`;
+  if (f.t === 'check') return `<label class="check${f.wide ? ' wide' : ''}"><input type="checkbox" id="${id}" name="${f.k}"${v ? ' checked' : ''}>${esc(f.l)}</label>`;
+  if (f.t === 'select') return `<label class="${f.wide ? 'wide' : ''}">${lab}<select id="${id}" name="${f.k}">${opts(typeof f.o === 'function' ? f.o() : f.o, v, f.blank)}</select></label>`;
+  if (f.t === 'area') return `<label class="wide">${lab}<textarea id="${id}" name="${f.k}">${esc(v)}</textarea></label>`;
+  const type = f.t === 'date' ? 'date' : 'text';
+  const extra = f.t === 'num' ? ' inputmode="decimal"' : '';
+  const list = f.list ? ` list="${f.list}"` : '';
+  return `<label class="${f.wide ? 'wide' : ''}">${lab}<input id="${id}" name="${f.k}" type="${type}" value="${esc(v)}"${extra}${list}${f.ph ? ` placeholder="${esc(f.ph)}"` : ''}></label>`;
+}
+const groups = (gs, rec) => gs.map((g) => `<fieldset><legend>${esc(g.g)}</legend><div class="form">${g.f.map((f) => field(f, rec)).join('')}</div>${g.hint ? `<p class="muted" style="margin:8px 0 0">${esc(g.hint)}</p>` : ''}</fieldset>`).join('');
+function readForm(root, gs) {
+  const out = {};
+  for (const g of gs) for (const f of g.f) {
+    const el = root.querySelector(`[name="${f.k}"]`);
+    if (!el) continue;
+    if (f.t === 'check') out[f.k] = el.checked;
+    else if (f.t === 'num') { const s = el.value.replace(/,/g, '').trim(); out[f.k] = s === '' ? null : (Number.isFinite(Number(s)) ? Number(s) : NaN); }
+    else out[f.k] = el.value.trim() || (f.t === 'date' ? null : '');
+  }
+  return out;
+}
+const emitters = () => S.partners.filter((p) => p.isEmitter).map((p) => [p.id, p.name]);
+const transporters = () => S.partners.filter((p) => p.isTransporter).map((p) => [p.id, p.name]);
+const disposers = () => S.partners.filter((p) => p.isDisposer).map((p) => [p.id, p.name]);
+const facOpts = () => S.facilities.map((f) => [f.id, f.name]);
+
+const M_FORM = [
+  { g: 'マニフェスト', f: [
+    { k: 'medium', l: '区分', t: 'select', o: [['paper', '紙マニフェスト'], ['electronic', '電子マニフェスト']], req: true, def: 'paper' },
+    { k: 'manifestNo', l: '交付番号／登録番号', req: true },
+    { k: 'issueDate', l: '交付年月日／引渡し日', t: 'date', req: true },
+    { k: 'facilityId', l: '処分事業場（自社）', t: 'select', o: facOpts, req: true },
+  ] },
+  { g: '排出事業者・運搬', f: [
+    { k: 'emitterId', l: '排出事業者', t: 'select', o: emitters, blank: '選択してください', req: true },
+    { k: 'emitterSite', l: '排出事業場', ph: '例：本社工場' },
+    { k: 'transporterId', l: '収集運搬業者', t: 'select', o: transporters, blank: '（自己搬入）' },
+  ], hint: '一覧にない取引先は「マスタ」で追加してください。' },
+  { g: '産業廃棄物', f: [
+    { k: 'wasteType', l: '種類', t: 'select', o: WASTE, blank: '選択してください', req: true },
+    { k: 'wasteName', l: '名称', ph: '例：廃塗料' },
+    { k: 'declaredQty', l: 'マニフェスト記載数量', t: 'num' },
+    { k: 'declaredUnit', l: '単位', t: 'select', o: UNITS, def: 't' },
+    { k: 'packaging', l: '荷姿' },
+    { k: 'special', l: '特別管理産業廃棄物', t: 'check' },
+  ] },
+  { g: '受入れ・処分（帳簿に記載）', f: [
+    { k: 'receivedDate', l: '受入日', t: 'date' },
+    { k: 'receivedQtyT', l: '受入量（t・計量値）', t: 'num' },
+    { k: 'disposalMethod', l: '処分方法', list: 'methods' },
+    { k: 'disposalEndDate', l: '処分終了日', t: 'date' },
+    { k: 'disposedQtyT', l: '処分量（t）', t: 'num' },
+  ] },
+  { g: '処分終了の通知', f: [
+    { k: 'c2SentDate', l: '紙：C2票送付日', t: 'date' },
+    { k: 'dSentDate', l: '紙：D票送付日', t: 'date' },
+    { k: 'disposalReportedDate', l: '電子：処分終了報告日', t: 'date' },
+  ] },
+  { g: '最終処分', f: [
+    { k: 'finalNoticeReceivedDate', l: '最終処分終了の報告を受けた日', t: 'date' },
+    { k: 'finalDisposalDate', l: '最終処分終了日', t: 'date' },
+    { k: 'finalDisposalPlace', l: '最終処分の場所' },
+    { k: 'eSentDate', l: '紙：E票送付日', t: 'date' },
+    { k: 'finalReportedDate', l: '電子：最終処分終了報告日', t: 'date' },
+  ], hint: '二次マニフェストのE票を受け取ると、紐付いた受託マニフェストに自動で入ります。' },
+  { g: '備考', f: [{ k: 'note', l: '備考', t: 'area' }] },
+];
+const S_FORM = [
+  { g: 'マニフェスト（自社が排出事業者として交付）', f: [
+    { k: 'medium', l: '区分', t: 'select', o: [['paper', '紙マニフェスト'], ['electronic', '電子マニフェスト']], req: true, def: 'paper' },
+    { k: 'manifestNo', l: '交付番号／登録番号', req: true },
+    { k: 'issueDate', l: '交付日／引渡し日', t: 'date', req: true },
+    { k: 'registeredDate', l: '電子：JWNET登録日', t: 'date' },
+    { k: 'facilityId', l: '排出事業場（自社の処分事業場）', t: 'select', o: facOpts, req: true },
+  ] },
+  { g: '処分後物', f: [
+    { k: 'wasteType', l: '種類', t: 'select', o: WASTE, blank: '選択してください', req: true },
+    { k: 'wasteName', l: '名称', ph: '例：破砕後廃プラ' },
+    { k: 'qtyT', l: '持出量（t）', t: 'num', req: true },
+    { k: 'special', l: '特別管理産業廃棄物', t: 'check' },
+  ] },
+  { g: '委託先', f: [
+    { k: 'transporterId', l: '収集運搬業者', t: 'select', o: transporters, blank: '（なし）' },
+    { k: 'disposerId', l: '処分業者', t: 'select', o: disposers, blank: '選択してください', req: true },
+    { k: 'destAddress', l: '持出先（処分事業場の所在地）' },
+    { k: 'disposalMethod', l: '処分方法', list: 'methods' },
+  ] },
+  { g: '返送票・終了報告の受領', f: [
+    { k: 'b2Date', l: 'B2票／運搬終了報告', t: 'date' },
+    { k: 'dDate', l: 'D票／処分終了報告', t: 'date' },
+    { k: 'eDate', l: 'E票／最終処分終了報告', t: 'date' },
+    { k: 'finalDisposalDate', l: '最終処分終了日', t: 'date' },
+    { k: 'finalDisposalPlace', l: '最終処分の場所' },
+    { k: 'reportedToAuthority', l: '措置内容等報告書の提出日', t: 'date' },
+  ] },
+  { g: '備考', f: [{ k: 'note', l: '備考', t: 'area' }] },
+];
+const F_FORM = [{ g: '処分事業場', f: [
+  { k: 'name', l: '名称', req: true }, { k: 'address', l: '所在地', req: true },
+  { k: 'permitNo', l: '処分業の許可番号' }, { k: 'permitAuthority', l: '許可自治体' },
+  { k: 'permitExpiry', l: '許可の有効期限', t: 'date' }, { k: 'methods', l: '処分方法', ph: '破砕,選別' },
+  { k: 'isFinalDisposal', l: '最終処分場（埋立）', t: 'check' },
+] }];
+const P_FORM = [{ g: '取引先', f: [
+  { k: 'name', l: '氏名又は名称', req: true }, { k: 'address', l: '住所' }, { k: 'tel', l: '電話番号' },
+  { k: 'jwnetNo', l: 'JWNET加入者番号' },
+  { k: 'isEmitter', l: '排出事業者', t: 'check' }, { k: 'isTransporter', l: '収集運搬業者', t: 'check' }, { k: 'isDisposer', l: '処分業者（二次委託先）', t: 'check' },
+  { k: 'permitNo', l: '業許可番号' }, { k: 'permitExpiry', l: '許可の有効期限', t: 'date' },
+  { k: 'contractEnd', l: '委託契約の期限', t: 'date' },
+  { k: 'note', l: '備考', t: 'area' },
+] }];
+const C_FORM = [{ g: '自社（処分業者）', f: [
+  { k: 'name', l: '氏名又は名称', req: true }, { k: 'address', l: '住所' }, { k: 'tel', l: '電話番号' },
+  { k: 'jwnetNo', l: 'JWNET加入者番号' }, { k: 'ledgerStartMonth', l: '帳簿の年度開始月', t: 'num', def: 4 },
+] }];
+
+// ===== ダイアログ =====
+const dlg = $('#dlg');
+function openDialog(html, onMount) {
+  $('#dlgBody').innerHTML = html;
+  if (!dlg.open) dlg.showModal();
+  onMount?.($('#dlgBody'));
+}
+const closeDialog = () => dlg.open && dlg.close();
+dlg.addEventListener('click', (e) => { if (e.target === dlg) closeDialog(); });
+function armDelete(btn, run) {
+  btn.addEventListener('click', async () => {
+    if (!btn.classList.contains('armed')) { btn.classList.add('armed'); btn.textContent = 'もう一度押すと削除'; setTimeout(() => { btn.classList.remove('armed'); btn.textContent = '削除'; }, 4000); return; }
+    try { await run(); closeDialog(); toast('削除しました'); }
+    catch (e) { toast(e?.code === 'used' ? 'マニフェストで使われているため削除できません' : e?.code === 'linked' ? '二次マニフェストに紐付いているため削除できません' : dbError(e)); }
+  });
+}
+function needMasters() {
+  if (S.facilities.length && S.partners.some((p) => p.isEmitter)) return false;
+  openDialog(`<div class="dlg-head"><h2 style="margin:0">先にマスタを登録してください</h2></div>
+    <p>マニフェストを登録するには、自社の<b>処分事業場</b>と、取引先の<b>排出事業者</b>が1件以上必要です。</p>
+    <div class="dlg-foot"><button class="btn primary" id="goM">マスタを開く</button><button class="btn" id="cx">閉じる</button></div>`, (r) => {
+    r.querySelector('#goM').onclick = () => { closeDialog(); setTab('masters'); };
+    r.querySelector('#cx').onclick = closeDialog;
+  });
+  return true;
+}
+
+// ---- 受託マニフェスト ----
+function jwnetText(m) {
+  const fac = byId('facilities', m.facilityId) || {};
+  const res = S.secondaries.filter((s) => (s.links || []).some((l) => l.manifestId === m.id));
+  return [
+    `登録番号: ${m.manifestNo}`,
+    `処分終了日: ${jp(m.disposalEndDate) || '（未入力）'}`,
+    `処分事業場: ${fac.name || ''} ${fac.address || ''}（許可番号 ${fac.permitNo || '未設定'}）`,
+    `処分方法: ${m.disposalMethod || '（未入力）'}`,
+    `処分量: ${m.disposedQtyT ?? '（未入力）'} t`,
+    `中間処理後物: ${res.length ? res.map((s) => `${s.wasteType} ${(s.links.find((l) => l.manifestId === m.id) || {}).qtyT ?? '?'} t → ${pname(s.disposerId)}`).join(' / ') : 'なし'}`,
+    m.finalDisposalDate ? `最終処分終了日: ${jp(m.finalDisposalDate)}　場所: ${m.finalDisposalPlace}` : '',
+  ].filter(Boolean).join('\n');
+}
+function openManifest(id) {
+  if (!id && needMasters()) return;
+  const m = id ? byId('manifests', id) : { issueDate: today(), medium: 'paper', declaredUnit: 't', facilityId: S.facilities[0]?.id };
+  if (!m) return;
+  const ts = id ? primaryTasks(m, today()) : [];
+  const secs = id ? S.secondaries.filter((s) => (s.links || []).some((l) => l.manifestId === id)) : [];
+  openDialog(`
+    <div class="dlg-head"><h2 style="margin:0">${id ? `${MEDIUM[m.medium]}マニフェスト ${esc(m.manifestNo)}` : '受託マニフェスト登録'}</h2>${id ? tagState(worst(ts)) : ''}</div>
+    ${id ? `<div class="card" style="box-shadow:none;border:1px solid var(--line)"><h3 style="margin-top:0">手続きと期限</h3><ul class="tasks">${ts.map((x) => `
+      <li><span class="label">${esc(x.label)}</span>${tagState(x.state)}
+        <span class="muted">${x.due ? `期限 ${jp(x.due)}${x.left != null && !x.done ? (x.left < 0 ? `（${-x.left}日超過）` : `（あと${x.left}日）`) : ''}` : esc(x.waitingFor)}${x.done ? `　完了 ${jp(x.done)}` : ''}</span>
+        <span class="spacer"></span>
+        ${!x.done && x.due ? `<input type="date" id="td_${x.key}" value="${today()}" aria-label="${esc(x.label)}の完了日"><button class="btn small" data-done="${x.key}">完了登録</button>` : ''}
+      </li>`).join('')}</ul>
+      ${m.medium === 'electronic' ? `<details style="margin-top:8px"><summary class="muted">JWNETに入力する内容を表示</summary><pre class="payload" id="jw">${esc(jwnetText(m))}</pre><button class="btn small" id="copyJw" style="margin-top:6px">コピー</button></details>` : ''}
+      ${secs.length ? `<p class="muted" style="margin-bottom:0">二次マニフェスト：${secs.map((s) => `${esc(s.manifestNo)}（${s.eDate ? '最終処分済' : '最終処分待ち'}）`).join('、')}</p>` : ''}
+    </div>` : ''}
+    <form id="mf" novalidate>${groups(M_FORM, m)}</form>
+    <p class="err" id="err" role="alert"></p>
+    <div class="dlg-foot">
+      <button class="btn primary" id="save">保存</button>
+      <button class="btn" id="cx">閉じる</button>
+      ${id ? `<button class="btn" id="mkSec">二次マニフェストを作成</button><span class="spacer"></span><button class="btn danger" id="del">削除</button>` : ''}
+    </div>`, (r) => {
+    r.querySelector('#cx').onclick = closeDialog;
+    r.querySelector('[name=wasteType]').addEventListener('change', (e) => { if (e.target.value.startsWith('【特管】')) r.querySelector('[name=special]').checked = true; });
+    r.querySelectorAll('[data-done]').forEach((b) => b.onclick = async () => {
+      const k = b.dataset.done; const d = r.querySelector(`#td_${k}`).value || today();
+      try { await put('manifests', { ...m, [k]: d }); toast('完了にしました'); openManifest(id); } catch (e) { toast(dbError(e)); }
+    });
+    r.querySelector('#copyJw')?.addEventListener('click', () => copy(r.querySelector('#jw').textContent));
+    r.querySelector('#mkSec')?.addEventListener('click', () => openSecondary(null, id));
+    if (id) armDelete(r.querySelector('#del'), async () => {
+      if (secs.length) throw { code: 'linked' };
+      await del('manifests', id);
+    });
+    r.querySelector('#save').onclick = async () => {
+      const v = readForm(r, M_FORM);
+      if (v.wasteType.startsWith('【特管】')) v.special = true;
+      const err = validateManifest(v, id);
+      if (err) { r.querySelector('#err').textContent = err; return; }
+      const fac = byId('facilities', v.facilityId);
+      if (fac?.isFinalDisposal && v.disposalEndDate) {
+        v.finalDisposalDate ||= v.disposalEndDate;
+        v.finalDisposalPlace ||= `${fac.name} ${fac.address}`.trim();
+      }
+      try { const saved = await put('manifests', { ...m, ...v }); toast('保存しました'); openManifest(saved.id); } catch (e) { toast(dbError(e)); }
+    };
+  });
+}
+function validateManifest(v, id) {
+  if (!v.manifestNo) return v.medium === 'paper' ? '交付番号を入力してください' : '登録番号を入力してください';
+  if (!v.issueDate) return '交付年月日（引渡し日）を入力してください';
+  if (!v.facilityId) return '処分事業場を選んでください';
+  if (!v.emitterId) return '排出事業者を選んでください';
+  if (!v.wasteType) return '廃棄物の種類を選んでください';
+  for (const k of ['declaredQty', 'receivedQtyT', 'disposedQtyT']) if (Number.isNaN(v[k])) return '数量は数字で入力してください';
+  if (S.manifests.some((x) => x.id !== id && x.medium === v.medium && x.manifestNo === v.manifestNo)) return `番号「${v.manifestNo}」は既に登録されています`;
+  if (v.receivedDate && v.receivedDate < v.issueDate) return '受入日が交付日より前になっています';
+  if (v.disposalEndDate && !v.receivedDate) return '処分終了日を入れる前に受入日を入力してください';
+  if (v.disposalEndDate && v.disposalEndDate < v.receivedDate) return '処分終了日が受入日より前になっています';
+  for (const [k, l] of [['c2SentDate', 'C2票送付日'], ['dSentDate', 'D票送付日'], ['disposalReportedDate', '処分終了報告日']]) {
+    if (v[k] && (!v.disposalEndDate || v[k] < v.disposalEndDate)) return `${l}は処分終了日以降の日付にしてください`;
+  }
+  return '';
+}
+
+// ---- 二次マニフェスト ----
+async function propagateFinal(s) {
+  if (!s.eDate) return 0;
+  let n = 0;
+  for (const l of s.links || []) {
+    const m = byId('manifests', l.manifestId);
+    if (!m || m.finalNoticeReceivedDate) continue;
+    await put('manifests', { ...m, finalNoticeReceivedDate: s.eDate, finalDisposalDate: s.finalDisposalDate || s.eDate, finalDisposalPlace: s.finalDisposalPlace });
+    n++;
+  }
+  return n;
+}
+function openSecondary(id, fromManifest) {
+  if (!id && needMasters()) return;
+  const pre = fromManifest ? byId('manifests', fromManifest) : null;
+  const s = id ? byId('secondaries', id) : { issueDate: today(), medium: 'paper', facilityId: pre?.facilityId || S.facilities[0]?.id, links: pre ? [{ manifestId: pre.id, qtyT: pre.disposedQtyT ?? null }] : [] };
+  if (!s) return;
+  const linked = new Map((s.links || []).map((l) => [l.manifestId, l.qtyT]));
+  const cands = S.manifests.filter((m) => linked.has(m.id) || (m.disposalEndDate && !byId('facilities', m.facilityId)?.isFinalDisposal && !m.finalNoticeReceivedDate))
+    .sort((a, b) => (b.disposalEndDate || '').localeCompare(a.disposalEndDate || ''));
+  const ts = id ? secondaryTasks(s, today()) : [];
+  openDialog(`
+    <div class="dlg-head"><h2 style="margin:0">${id ? `二次・${MEDIUM[s.medium]}マニフェスト ${esc(s.manifestNo)}` : '二次マニフェスト登録'}</h2>${id ? tagState(worst(ts)) : ''}</div>
+    ${id ? `<div class="card" style="box-shadow:none;border:1px solid var(--line)"><h3 style="margin-top:0">返送票・終了報告の確認</h3><ul class="tasks">${ts.map((x) => `
+      <li><span class="label">${esc(x.label)}</span>${tagState(x.state)}
+      <span class="muted">期限 ${jp(x.due)}${x.left != null && !x.done ? (x.left < 0 ? `（${-x.left}日超過）` : `（あと${x.left}日）`) : ''}${x.done ? `　受領 ${jp(x.done)}` : ''}${x.report ? `　<span class="tag bad">措置内容等報告書 ${jp(x.report)}まで</span>` : ''}</span></li>`).join('')}</ul>
+      <p class="muted" style="margin-bottom:0">受領日は下のフォームに入れて保存してください。E票は最終処分の場所も一緒に入れます。</p></div>` : ''}
+    <form id="sf" novalidate>${groups(S_FORM, s)}
+      <fieldset style="margin-top:12px"><legend>元の受託マニフェスト（紐付け）</legend>
+      ${cands.length ? `<div class="tw"><table><thead><tr><th>紐付け</th><th>番号</th><th>排出事業者</th><th>種類</th><th>処分終了</th><th class="num">処分量</th><th>按分量（t）</th></tr></thead><tbody>
+        ${cands.map((m) => `<tr><td><input type="checkbox" data-link="${m.id}"${linked.has(m.id) ? ' checked' : ''} aria-label="${esc(m.manifestNo)}を紐付け"></td>
+          <td>${esc(m.manifestNo)}</td><td>${esc(pname(m.emitterId))}</td><td>${esc(m.wasteType)}</td><td class="nw">${jp(m.disposalEndDate) || '処分中'}</td>
+          <td class="num">${q3(m.disposedQtyT)}</td><td><input data-alloc="${m.id}" inputmode="decimal" value="${esc(linked.get(m.id) ?? '')}" style="width:96px"></td></tr>`).join('')}
+      </tbody></table></div>` : '<p class="muted">紐付けできる受託マニフェスト（処分終了済み・最終処分前）がありません。</p>'}
+      </fieldset>
+    </form>
+    <p class="err" id="err" role="alert"></p>
+    <div class="dlg-foot"><button class="btn primary" id="save">保存</button><button class="btn" id="cx">閉じる</button>${id ? '<span class="spacer"></span><button class="btn danger" id="del">削除</button>' : ''}</div>`, (r) => {
+    r.querySelector('#cx').onclick = closeDialog;
+    r.querySelector('[name=disposerId]').addEventListener('change', (e) => { const p = byId('partners', e.target.value); const a = r.querySelector('[name=destAddress]'); if (p && !a.value) a.value = p.address || ''; });
+    if (id) armDelete(r.querySelector('#del'), () => del('secondaries', id));
+    r.querySelector('#save').onclick = async () => {
+      const v = readForm(r, S_FORM);
+      if (v.wasteType.startsWith('【特管】')) v.special = true;
+      v.links = [...r.querySelectorAll('[data-link]')].filter((c) => c.checked).map((c) => {
+        const a = r.querySelector(`[data-alloc="${c.dataset.link}"]`).value.trim();
+        return { manifestId: c.dataset.link, qtyT: a === '' ? null : Number(a) };
+      });
+      const err = !v.manifestNo ? '交付番号（登録番号）を入力してください' : !v.issueDate ? '交付日を入力してください' : !v.facilityId ? '処分事業場を選んでください'
+        : !v.wasteType ? '処分後物の種類を選んでください' : v.qtyT == null || Number.isNaN(v.qtyT) ? '持出量を数字で入力してください' : !v.disposerId ? '委託先の処分業者を選んでください'
+        : v.eDate && !v.finalDisposalPlace ? 'E票を受領したら最終処分の場所も入力してください'
+        : v.links.some((l) => Number.isNaN(l.qtyT)) ? '按分量は数字で入力してください'
+        : S.secondaries.some((x) => x.id !== id && x.medium === v.medium && x.manifestNo === v.manifestNo) ? `番号「${v.manifestNo}」は既に登録されています` : '';
+      if (err) { r.querySelector('#err').textContent = err; return; }
+      try {
+        const saved = await put('secondaries', { ...s, ...v });
+        const n = await propagateFinal(saved);
+        toast(n ? `保存しました。受託マニフェスト${n}件に最終処分終了を反映しました` : '保存しました');
+        openSecondary(saved.id);
+      } catch (e) { toast(dbError(e)); }
+    };
+  });
+}
+
+// ---- マスタ ----
+function openRecord(coll, form, id, title) {
+  const rec = id ? byId(coll, id) : {};
+  openDialog(`<div class="dlg-head"><h2 style="margin:0">${esc(title)}${id ? 'の編集' : 'の追加'}</h2></div>
+    <form novalidate>${groups(form, rec)}</form><p class="err" id="err" role="alert"></p>
+    <div class="dlg-foot"><button class="btn primary" id="save">保存</button><button class="btn" id="cx">閉じる</button>${id ? '<span class="spacer"></span><button class="btn danger" id="del">削除</button>' : ''}</div>`, (r) => {
+    r.querySelector('#cx').onclick = closeDialog;
+    if (id) armDelete(r.querySelector('#del'), async () => {
+      const used = S.manifests.some((m) => [m.facilityId, m.emitterId, m.transporterId].includes(id)) || S.secondaries.some((s) => [s.facilityId, s.transporterId, s.disposerId].includes(id));
+      if (used) throw { code: 'used' };
+      await del(coll, id);
+    });
+    r.querySelector('#save').onclick = async () => {
+      const v = readForm(r, form);
+      if (!v.name) { r.querySelector('#err').textContent = '名称を入力してください'; return; }
+      if (coll === 'facilities' && !v.address) { r.querySelector('#err').textContent = '所在地を入力してください'; return; }
+      if (coll === 'partners' && !v.isEmitter && !v.isTransporter && !v.isDisposer) { r.querySelector('#err').textContent = '区分（排出事業者・収集運搬・処分）を1つ以上選んでください'; return; }
+      try { await put(coll, { ...rec, ...v }); toast('保存しました'); closeDialog(); } catch (e) { toast(dbError(e)); }
+    };
+  });
+}
+
+function copy(text) {
+  try { navigator.clipboard.writeText(text).then(() => toast('コピーしました'), () => toast('選択してコピーしてください')); }
+  catch (e) { toast('選択してコピーしてください'); }
+}
+
+// ===== 画面 =====
+let tab = 'dash';
+try { tab = localStorage.getItem('mf-proc-tab') || 'dash'; } catch (e) {}
+const F = { q: '', facility: '', status: '', medium: '', sq: '', open: false, lFac: '', lPeriod: 'month', lMonth: today().slice(0, 7), lYear: null };
+function setTab(t) { tab = t; try { localStorage.setItem('mf-proc-tab', t); } catch (e) {} render(); window.scrollTo(0, 0); }
+$('#tabs').addEventListener('click', (e) => { const b = e.target.closest('[data-tab]'); if (b) setTab(b.dataset.tab); });
+
+function render() {
+  document.querySelectorAll('#tabs [data-tab]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === tab)));
+  $('#mode').textContent = mode === 'db' ? 'データはこのページに保存（共有メンバー全員で同じデータ）' : mode === 'local' ? 'データはこの端末のブラウザにだけ保存' : '接続中…';
+  const v = $('#view');
+  const html = { dash: viewDash, manifests: viewManifests, secondary: viewSecondary, ledger: viewLedger, masters: viewMasters }[tab]();
+  // 入力中のフィルタのフォーカスを保つ
+  const act = document.activeElement?.id;
+  const pos = document.activeElement?.selectionStart;
+  v.innerHTML = (mode === 'local' ? `<div class="banner warn">この表示ではクラウドに保存できないため、データはこの端末のブラウザにだけ保存されます。claude.ai にサインインして開くと、どの端末からでも同じデータを使えます。</div>` : '') + html;
+  if (act) { const el = document.getElementById(act); if (el && el.closest('#view')) { el.focus(); try { if (pos != null) el.setSelectionRange(pos, pos); } catch (e) {} } }
+}
+
+function allAlerts() {
+  const t = today(), out = [];
+  for (const m of S.manifests) for (const x of primaryTasks(m, t)) if (x.state === 'overdue' || x.state === 'soon') out.push({ x, kind: `受託・${MEDIUM[m.medium]}`, no: m.manifestNo, party: pname(m.emitterId), open: `m:${m.id}`, quick: `m:${m.id}:${x.key}` });
+  for (const s of S.secondaries) for (const x of secondaryTasks(s, t)) if (x.state === 'overdue' || x.state === 'soon') out.push({ x, kind: `二次・${MEDIUM[s.medium]}`, no: s.manifestNo, party: pname(s.disposerId), open: `s:${s.id}`, quick: x.key === 'eDate' ? null : `s:${s.id}:${x.key}` });
+  return out.sort((a, b) => a.x.due.localeCompare(b.x.due));
+}
+
+function viewDash() {
+  const t = today();
+  const al = allAlerts();
+  const over = al.filter((a) => a.x.state === 'overdue').length;
+  const inProc = S.manifests.filter((m) => m.receivedDate && !m.disposalEndDate).length;
+  const waitFinal = S.manifests.filter((m) => m.disposalEndDate && !m.finalDisposalDate).length;
+  const noQty = S.manifests.filter((m) => m.receivedDate && m.receivedQtyT == null).length;
+  const exp = [
+    ...S.facilities.map((f) => ({ name: `自社 ${f.name}`, what: '処分業許可', date: f.permitExpiry, open: `f:${f.id}` })),
+    ...S.partners.flatMap((p) => [{ name: p.name, what: '業許可', date: p.permitExpiry, open: `p:${p.id}` }, { name: p.name, what: '委託契約', date: p.contractEnd, open: `p:${p.id}` }]),
+  ].filter((x) => x.date && diff(t, x.date) <= 90).sort((a, b) => a.date.localeCompare(b.date));
+  const empty = !S.facilities.length && !S.manifests.length;
+  return `
+    ${empty ? `<div class="card"><h2>はじめに</h2><p>1. 「マスタ」で自社情報・処分事業場・取引先を登録します。<br>2. 「受託マニフェスト」で受け入れたマニフェストを登録します。<br>期限が近い手続きはこの画面に一覧で出ます。</p><button class="btn primary" data-go="masters">マスタを開く</button></div>` : ''}
+    <div class="stats">
+      <div class="stat ${over ? 'bad' : ''}"><div class="n">${over}</div><div class="l">期限超過の手続き</div></div>
+      <div class="stat ${al.length - over ? 'warn' : ''}"><div class="n">${al.length - over}</div><div class="l">期限間近の手続き</div></div>
+      <div class="stat"><div class="n">${inProc}</div><div class="l">受入済・処分中</div></div>
+      <div class="stat"><div class="n">${waitFinal}</div><div class="l">最終処分終了待ち</div></div>
+    </div>
+    <div class="card">
+      <div class="row" style="margin-bottom:8px"><h2 style="margin:0">要対応の手続き</h2><span class="spacer"></span><button class="btn primary" data-new="m">＋ 受託マニフェスト登録</button></div>
+      ${al.length ? `<div class="tw"><table><thead><tr><th>状態</th><th>期限</th><th>手続き</th><th>区分</th><th>番号</th><th>相手先</th><th>措置内容等報告書</th><th></th></tr></thead><tbody>
+        ${al.map((a) => `<tr><td>${tagState(a.x.state, a.x.state === 'overdue' ? `${-a.x.left}日超過` : `あと${a.x.left}日`)}</td>
+          <td class="nw">${jp(a.x.due)}</td><td>${esc(a.x.label)}</td><td class="nw">${a.kind}</td>
+          <td><button class="btn small" data-open="${a.open}">${esc(a.no)}</button></td><td>${esc(a.party)}</td>
+          <td>${a.x.report ? `<span class="tag bad">${jp(a.x.report)}まで</span>` : '—'}</td>
+          <td>${a.quick ? `<button class="btn small" data-quick="${a.quick}">今日完了</button>` : ''}</td></tr>`).join('')}
+      </tbody></table></div>` : '<div class="empty">期限が迫っている手続きはありません</div>'}
+      <p class="muted" style="margin-bottom:0">紙：処分終了日から10日以内にC2票・D票、最終処分終了の報告を受けてから10日以内にE票を送付。電子：処分終了・最終処分終了から3日以内（土日祝・年末年始を除く）にJWNETへ報告。二次マニフェストは交付日から90日（特管60日）・180日以内に返送がなければ措置内容等報告書の対象です。</p>
+    </div>
+    <div class="cols">
+      <div class="card"><h2>許可・契約の期限（90日以内）</h2>
+        ${exp.length ? `<div class="tw"><table><thead><tr><th>状態</th><th>対象</th><th>相手先</th><th>期限</th></tr></thead><tbody>
+          ${exp.map((x) => { const l = diff(t, x.date); return `<tr class="click" data-open="${x.open}"><td><span class="tag ${l < 0 ? 'bad' : 'warn'}">${l < 0 ? '期限切れ' : `あと${l}日`}</span></td><td>${x.what}</td><td>${esc(x.name)}</td><td class="nw">${jp(x.date)}</td></tr>`; }).join('')}
+        </tbody></table></div>` : '<div class="empty">期限が近いものはありません</div>'}
+      </div>
+      <div class="card"><h2>帳簿の記載漏れ</h2>
+        ${noQty ? `<p>受入量が未入力のマニフェストが <b>${noQty}件</b> あります。帳簿は翌月末までに記載が必要です。</p><button class="btn" data-filter="no_qty">一覧を見る</button>` : '<div class="empty">記載漏れはありません</div>'}
+      </div>
+    </div>`;
+}
+
+const STATUS = { attention: '要対応（超過・間近）', in_process: '受入済・処分中', waiting_final: '最終処分終了待ち', not_received: '未受入', no_qty: '受入量未入力', done: 'すべて完了' };
+function viewManifests() {
+  const t = today();
+  const q = F.q.toLowerCase();
+  const rows = S.manifests.map((m) => { const ts = primaryTasks(m, t); return { m, ts, st: worst(ts) }; }).filter(({ m, st }) => {
+    if (F.facility && m.facilityId !== F.facility) return false;
+    if (F.medium && m.medium !== F.medium) return false;
+    if (F.status === 'attention' && !['overdue', 'soon'].includes(st)) return false;
+    if (F.status === 'in_process' && !(m.receivedDate && !m.disposalEndDate)) return false;
+    if (F.status === 'waiting_final' && !(m.disposalEndDate && !m.finalDisposalDate)) return false;
+    if (F.status === 'not_received' && m.receivedDate) return false;
+    if (F.status === 'no_qty' && !(m.receivedDate && m.receivedQtyT == null)) return false;
+    if (F.status === 'done' && !['done', 'late_done'].includes(st)) return false;
+    if (q && ![m.manifestNo, pname(m.emitterId), m.emitterSite, pname(m.transporterId), m.wasteType, m.wasteName, m.note].join(' ').toLowerCase().includes(q)) return false;
+    return true;
+  }).sort((a, b) => b.m.issueDate.localeCompare(a.m.issueDate));
+  return `<div class="card">
+    <div class="row" style="margin-bottom:10px"><h1>受託マニフェスト</h1><span class="spacer"></span><button class="btn primary" data-new="m">＋ 登録</button></div>
+    <div class="row" style="margin-bottom:12px">
+      <input id="fq" placeholder="番号・排出事業者・種類で検索" value="${esc(F.q)}" style="max-width:240px" aria-label="検索">
+      <select id="ffac" style="max-width:190px" aria-label="事業場">${opts(facOpts(), F.facility, '全事業場')}</select>
+      <select id="fst" style="max-width:200px" aria-label="状態">${opts(Object.entries(STATUS), F.status, 'すべての状態')}</select>
+      <select id="fmed" style="max-width:110px" aria-label="区分">${opts([['paper', '紙'], ['electronic', '電子']], F.medium, '紙・電子')}</select>
+    </div>
+    ${rows.length ? `<div class="tw"><table><thead><tr><th>区分</th><th>番号</th><th>交付日</th><th>排出事業者</th><th>種類</th><th>受入日</th><th class="num">受入量</th><th>処分</th><th>手続き</th></tr></thead><tbody>
+      ${rows.map(({ m, ts }) => `<tr class="click" data-open="m:${m.id}">
+        <td><span class="tag ${m.medium === 'electronic' ? 'info' : ''}">${MEDIUM[m.medium]}</span></td><td>${esc(m.manifestNo)}</td><td class="nw">${jp(m.issueDate)}</td>
+        <td>${esc(pname(m.emitterId))}${m.emitterSite ? `<div class="muted">${esc(m.emitterSite)}</div>` : ''}</td>
+        <td>${m.special ? '<span class="tag bad">特管</span> ' : ''}${esc(m.wasteType)}</td><td class="nw">${jp(m.receivedDate) || '—'}</td><td class="num">${q3(m.receivedQtyT)}</td>
+        <td class="nw">${m.disposalEndDate ? `${esc(m.disposalMethod)}<div class="muted">${jp(m.disposalEndDate)} 終了</div>` : m.receivedDate ? '<span class="tag info">処分中</span>' : '<span class="tag">未受入</span>'}</td>
+        <td>${taskTags(ts)}</td></tr>`).join('')}
+    </tbody></table></div><p class="muted">${rows.length}件</p>` : `<div class="empty">${S.manifests.length ? '条件に合うマニフェストはありません' : 'まだ登録されていません。「＋ 登録」から受け入れたマニフェストを入力してください。'}</div>`}
+  </div>`;
+}
+
+function viewSecondary() {
+  const t = today(), q = F.sq.toLowerCase();
+  const rows = S.secondaries.filter((s) => (!F.open || !s.eDate) && (!q || [s.manifestNo, pname(s.disposerId), s.wasteType, s.destAddress].join(' ').toLowerCase().includes(q)))
+    .sort((a, b) => b.issueDate.localeCompare(a.issueDate));
+  return `<div class="card">
+    <div class="row" style="margin-bottom:10px"><h1>二次マニフェスト</h1><span class="spacer"></span><button class="btn primary" data-new="s">＋ 登録</button></div>
+    <div class="row" style="margin-bottom:12px">
+      <input id="sq" placeholder="番号・委託先・種類で検索" value="${esc(F.sq)}" style="max-width:240px" aria-label="検索">
+      <label class="row muted"><input type="checkbox" id="sopen"${F.open ? ' checked' : ''}>最終処分終了待ちのみ</label>
+    </div>
+    ${rows.length ? `<div class="tw"><table><thead><tr><th>区分</th><th>番号</th><th>交付日</th><th>種類</th><th class="num">持出量</th><th>委託先</th><th>紐付く受託</th><th>返送状況</th></tr></thead><tbody>
+      ${rows.map((s) => `<tr class="click" data-open="s:${s.id}"><td><span class="tag ${s.medium === 'electronic' ? 'info' : ''}">${MEDIUM[s.medium]}</span></td>
+        <td>${esc(s.manifestNo)}</td><td class="nw">${jp(s.issueDate)}</td><td>${esc(s.wasteType)}</td><td class="num">${q3(s.qtyT)}</td>
+        <td>${esc(pname(s.disposerId))}<div class="muted">${esc(s.destAddress)}</div></td><td class="num">${(s.links || []).length}件</td><td>${taskTags(secondaryTasks(s, t))}</td></tr>`).join('')}
+    </tbody></table></div>` : `<div class="empty">${S.secondaries.length ? '条件に合うものはありません' : '処分後物を委託したら、ここで二次マニフェストを登録します。'}</div>`}
+  </div>`;
+}
+
+// ---- 帳簿 ----
+function buildLedger(facId, from, to) {
+  const inR = (d) => d && d >= from && d <= to;
+  const ms = S.manifests.filter((m) => m.facilityId === facId), ss = S.secondaries.filter((s) => s.facilityId === facId);
+  const rec = ms.filter((m) => inR(m.receivedDate)), dis = ms.filter((m) => inR(m.disposalEndDate)), out = ss.filter((s) => inR(s.issueDate));
+  const E = [], issues = [];
+  for (const m of rec) { E.push({ d: m.receivedDate, k: '受入', no: m.manifestNo, iss: m.issueDate, p: pname(m.emitterId), w: m.wasteType, me: '', q: m.receivedQtyT }); if (m.receivedQtyT == null) issues.push(`${m.manifestNo}：受入量が未入力`); }
+  for (const m of dis) { E.push({ d: m.disposalEndDate, k: '処分', no: m.manifestNo, iss: m.issueDate, p: pname(m.emitterId), w: m.wasteType, me: m.disposalMethod, q: m.disposedQtyT }); if (m.disposedQtyT == null) issues.push(`${m.manifestNo}：処分量が未入力`); if (!m.disposalMethod) issues.push(`${m.manifestNo}：処分方法が未入力`); }
+  for (const s of out) E.push({ d: s.issueDate, k: '持出', no: s.manifestNo, iss: s.issueDate, p: pname(s.disposerId), w: s.wasteType, me: s.destAddress, q: s.qtyT });
+  const ord = { 受入: 0, 処分: 1, 持出: 2 };
+  E.sort((a, b) => a.d.localeCompare(b.d) || ord[a.k] - ord[b.k] || a.no.localeCompare(b.no));
+  const sum = (rows) => { const mp = new Map(); for (const r of rows) { const k = r.key + '\u0000' + r.w; const c = mp.get(k) || { key: r.key, w: r.w, q: 0, n: 0 }; c.q = r3(c.q + (r.q ?? 0)); c.n++; mp.set(k, c); } return [...mp.values()].sort((a, b) => a.key.localeCompare(b.key, 'ja')); };
+  const tot = (xs) => r3(xs.reduce((a, b) => a + (b ?? 0), 0));
+  return {
+    E, issues,
+    byE: sum(rec.map((m) => ({ key: pname(m.emitterId), w: m.wasteType, q: m.receivedQtyT }))),
+    byM: sum(dis.map((m) => ({ key: m.disposalMethod || '（未入力）', w: m.wasteType, q: m.disposedQtyT }))),
+    byD: sum(out.map((s) => ({ key: `${pname(s.disposerId)}${s.destAddress ? `（${s.destAddress}）` : ''}`, w: s.wasteType, q: s.qtyT }))),
+    T: { r: tot(rec.map((m) => m.receivedQtyT)), d: tot(dis.map((m) => m.disposedQtyT)), o: tot(out.map((s) => s.qtyT)) },
+  };
+}
+function ledgerArgs() {
+  const facId = F.lFac || S.facilities[0]?.id;
+  const year = F.lYear ?? fy(today(), startMonth());
+  const range = F.lPeriod === 'year' ? fyRange(year, startMonth()) : monthRange(F.lMonth);
+  return { facId, year, range };
+}
+function viewLedger() {
+  if (!S.facilities.length) return `<div class="card"><h1>帳簿</h1><p class="empty">先に「マスタ」で処分事業場を登録してください。</p></div>`;
+  const { facId, year, range } = ledgerArgs();
+  const fac = byId('facilities', facId);
+  const L = buildLedger(facId, range.from, range.to);
+  const cy = fy(today(), startMonth());
+  const years = Array.from({ length: 6 }, (_, i) => cy + 1 - i);
+  const summ = (title, kl, rows) => `<div style="min-width:0"><h3>${title}</h3>${rows.length ? `<div class="tw"><table><thead><tr><th>${kl}</th><th>種類</th><th class="num">件数</th><th class="num">数量</th></tr></thead><tbody>${rows.map((r) => `<tr><td>${esc(r.key)}</td><td>${esc(r.w)}</td><td class="num">${r.n}</td><td class="num">${q3(r.q)}</td></tr>`).join('')}</tbody></table></div>` : '<p class="muted">該当なし</p>'}</div>`;
+  return `<div class="card"><div class="row">
+      <select id="lfac" style="max-width:220px" aria-label="事業場">${opts(facOpts(), facId)}</select>
+      <select id="lper" style="max-width:110px" aria-label="期間">${opts([['month', '月別'], ['year', '年度']], F.lPeriod)}</select>
+      ${F.lPeriod === 'month' ? `<input type="month" id="lmon" value="${F.lMonth}" style="max-width:170px" aria-label="対象月">` : `<select id="lyr" style="max-width:130px" aria-label="対象年度">${opts(years.map((y) => [y, `${y}年度`]), year)}</select>`}
+      <span class="spacer"></span>
+      <button class="btn" id="lcsv">CSVで保存</button>
+    </div></div>
+    <div class="card">
+      <h1>処分業者帳簿（${esc(fac.name)}）</h1>
+      <p class="muted">${esc(S.company.name || '（マスタで自社名を設定）')}　許可番号 ${esc(fac.permitNo || '未設定')}　所在地 ${esc(fac.address)}<br>対象期間 ${jp(range.from)} 〜 ${jp(range.to)}</p>
+      ${L.issues.length ? `<div class="banner bad" style="margin-bottom:12px">記載漏れ：${esc(L.issues.join(' ／ '))}</div>` : ''}
+      <div class="stats" style="margin-bottom:14px">
+        <div class="stat"><div class="n">${q3(L.T.r)}</div><div class="l">受入量</div></div>
+        <div class="stat"><div class="n">${q3(L.T.d)}</div><div class="l">処分量</div></div>
+        <div class="stat"><div class="n">${q3(L.T.o)}</div><div class="l">持出量</div></div>
+      </div>
+      <h2>明細</h2>
+      ${L.E.length ? `<div class="tw"><table><thead><tr><th>年月日</th><th>区分</th><th>管理票交付者／委託先</th><th>交付年月日</th><th>交付番号</th><th>廃棄物の種類</th><th>処分方法／持出先</th><th class="num">数量</th></tr></thead><tbody>
+        ${L.E.map((e) => `<tr><td class="nw">${jp(e.d)}</td><td><span class="tag ${e.k === '受入' ? 'info' : e.k === '処分' ? 'ok' : 'warn'}">${e.k}</span></td><td>${esc(e.p)}</td><td class="nw">${jp(e.iss)}</td><td>${esc(e.no)}</td><td>${esc(e.w)}</td><td>${esc(e.me)}</td><td class="num">${q3(e.q)}</td></tr>`).join('')}
+      </tbody></table></div>` : '<div class="empty">この期間の記載事項はありません</div>'}
+      <div class="cols" style="margin-top:8px">${summ('受入先ごとの受入量', '受入先', L.byE)}${summ('処分方法ごとの処分量', '処分方法', L.byM)}${summ('持出先ごとの持出量', '持出先', L.byD)}</div>
+      <p class="muted" style="margin-bottom:0">帳簿は事業場ごとに備え付け、翌月末までに記載し、1年ごとに閉鎖して閉鎖後5年間保存します（廃棄物処理法施行規則 第10条の8）。</p>
+    </div>`;
+}
+function ledgerCsv() {
+  const { facId, range } = ledgerArgs();
+  const fac = byId('facilities', facId);
+  const L = buildLedger(facId, range.from, range.to);
+  const rows = [['処分業者帳簿', fac.name, `${range.from}〜${range.to}`], [], ['年月日', '区分', '管理票交付者／委託先', '交付年月日', '交付番号', '廃棄物の種類', '処分方法／持出先', '数量(t)'],
+    ...L.E.map((e) => [e.d, e.k, e.p, e.iss, e.no, e.w, e.me, e.q]), [],
+    ['受入先ごとの受入量'], ['受入先', '種類', '件数', '数量(t)'], ...L.byE.map((r) => [r.key, r.w, r.n, r.q]), [],
+    ['処分方法ごとの処分量'], ['処分方法', '種類', '件数', '数量(t)'], ...L.byM.map((r) => [r.key, r.w, r.n, r.q]), [],
+    ['持出先ごとの持出量'], ['持出先', '種類', '件数', '数量(t)'], ...L.byD.map((r) => [r.key, r.w, r.n, r.q])];
+  return { name: `帳簿_${fac.name}_${range.from}_${range.to}.csv`, text: '﻿' + rows.map((r) => r.map((v) => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\r\n') };
+}
+
+function viewMasters() {
+  const c = S.company;
+  return `<div class="card"><div class="row" style="margin-bottom:10px"><h2 style="margin:0">自社情報（処分業者）</h2></div>
+      <form id="cform" novalidate>${groups(C_FORM, c).replace('<fieldset>', '<fieldset style="border:0;padding:0">').replace(/<legend>.*?<\/legend>/, '')}</form>
+      <div class="row" style="margin-top:10px"><button class="btn primary" id="csave">保存</button></div></div>
+    <div class="card"><div class="row" style="margin-bottom:10px"><h2 style="margin:0">処分事業場</h2><span class="spacer"></span><button class="btn" data-new="f">＋ 追加</button></div>
+      ${S.facilities.length ? `<div class="tw"><table><thead><tr><th>名称</th><th>所在地</th><th>許可番号</th><th>許可期限</th><th>処分方法</th><th>最終処分場</th></tr></thead><tbody>
+        ${S.facilities.map((f) => `<tr class="click" data-open="f:${f.id}"><td>${esc(f.name)}</td><td>${esc(f.address)}</td><td>${esc(f.permitNo)}<div class="muted">${esc(f.permitAuthority)}</div></td><td class="nw">${jp(f.permitExpiry) || '—'}</td><td>${esc(f.methods)}</td><td>${f.isFinalDisposal ? '○' : ''}</td></tr>`).join('')}
+      </tbody></table></div>` : '<div class="empty">処分事業場を追加してください（帳簿は事業場ごとに作ります）</div>'}</div>
+    <div class="card"><div class="row" style="margin-bottom:10px"><h2 style="margin:0">取引先</h2><span class="spacer"></span><button class="btn" data-new="p">＋ 追加</button></div>
+      ${S.partners.length ? `<div class="tw"><table><thead><tr><th>名称</th><th>区分</th><th>住所</th><th>許可番号</th><th>許可期限</th><th>契約期限</th></tr></thead><tbody>
+        ${[...S.partners].sort((a, b) => a.name.localeCompare(b.name, 'ja')).map((p) => `<tr class="click" data-open="p:${p.id}"><td>${esc(p.name)}</td><td>${[p.isEmitter && '排出', p.isTransporter && '運搬', p.isDisposer && '処分'].filter(Boolean).join('・')}</td><td>${esc(p.address)}</td><td>${esc(p.permitNo)}</td><td class="nw">${jp(p.permitExpiry) || '—'}</td><td class="nw">${jp(p.contractEnd) || '—'}</td></tr>`).join('')}
+      </tbody></table></div>` : '<div class="empty">排出事業者・収集運搬業者・二次委託先を追加してください</div>'}</div>
+    ${S.manifests.some((m) => m.sample) || S.partners.some((p) => p.sample) ? `<div class="card"><h2>サンプルデータ</h2><p class="muted">「サンプル」と付いた例のデータが入っています。実際の運用を始めるときに消してください。</p><button class="btn danger" id="clearSample">サンプルデータを消す</button></div>` : ''}`;
+}
+
+// ===== イベント =====
+document.addEventListener('click', async (e) => {
+  const t = e.target;
+  const open = t.closest('[data-open]');
+  if (open && open.closest('#view')) {
+    const [k, id] = open.dataset.open.split(':');
+    if (k === 'm') openManifest(id); else if (k === 's') openSecondary(id);
+    else if (k === 'f') openRecord('facilities', F_FORM, id, '処分事業場'); else if (k === 'p') openRecord('partners', P_FORM, id, '取引先');
+    return;
+  }
+  const nw = t.closest('[data-new]');
+  if (nw) { const k = nw.dataset.new; if (k === 'm') openManifest(); else if (k === 's') openSecondary(); else if (k === 'f') openRecord('facilities', F_FORM, null, '処分事業場'); else openRecord('partners', P_FORM, null, '取引先'); return; }
+  const go = t.closest('[data-go]'); if (go) return setTab(go.dataset.go);
+  const flt = t.closest('[data-filter]'); if (flt) { F.status = flt.dataset.filter; return setTab('manifests'); }
+  const qk = t.closest('[data-quick]');
+  if (qk) {
+    const [k, id, key] = qk.dataset.quick.split(':');
+    const coll = k === 'm' ? 'manifests' : 'secondaries';
+    const rec = byId(coll, id);
+    try { await put(coll, { ...rec, [key]: today() }); toast('完了にしました'); } catch (err) { toast(dbError(err)); }
+    return;
+  }
+  if (t.id === 'csave') {
+    const v = readForm($('#cform'), C_FORM);
+    if (!v.name) return toast('自社の名称を入力してください');
+    v.ledgerStartMonth = Math.min(12, Math.max(1, Math.trunc(v.ledgerStartMonth) || 4));
+    try { await putCompany({ ...S.company, ...v }); toast('保存しました'); } catch (err) { toast(dbError(err)); }
+    return;
+  }
+  if (t.id === 'lcsv') {
+    const { name, text } = ledgerCsv();
+    if (downloads) {
+      try { await downloads.save({ filename: name, data: text }); } catch (err) { if (err?.code !== 'declined') { copy(text); } }
+    } else copy(text);
+    return;
+  }
+  if (t.id === 'clearSample') {
+    if (!t.classList.contains('armed')) { t.classList.add('armed'); t.textContent = 'もう一度押すと消します'; return; }
+    try {
+      for (const c of COLLS) for (const r of S[c].filter((x) => x.sample)) await del(c, r.id);
+      toast('サンプルデータを消しました');
+    } catch (err) { toast(dbError(err)); }
+  }
+});
+document.addEventListener('input', (e) => {
+  const id = e.target.id;
+  if (id === 'fq') { F.q = e.target.value; render(); }
+  if (id === 'sq') { F.sq = e.target.value; render(); }
+});
+document.addEventListener('change', (e) => {
+  const { id, value, checked } = e.target;
+  const map = { ffac: 'facility', fst: 'status', fmed: 'medium', lfac: 'lFac', lper: 'lPeriod', lmon: 'lMonth' };
+  if (map[id]) { F[map[id]] = value; render(); }
+  if (id === 'lyr') { F.lYear = Number(value); render(); }
+  if (id === 'sopen') { F.open = checked; render(); }
+});
+
+// ===== 起動 =====
+render();
+(async () => {
+  try { db = window.claude ? await window.claude.use('db') : null; } catch (e) { db = null; }
+  try { downloads = window.claude ? await window.claude.use('downloads') : null; } catch (e) { downloads = null; }
+  if (!db) { mode = 'local'; loadLocal(); render(); return; }
+  mode = 'db';
+  let pending = false;
+  const schedule = () => { if (pending) return; pending = true; requestAnimationFrame(() => { pending = false; render(); }); };
+  for (const c of COLLS) {
+    db.collection(c).onSnapshot((snap) => { S[c] = snap.docs.map((d) => ({ ...d.data(), id: d.id })); schedule(); },
+      () => { mode = 'local'; render(); });
+  }
+  db.doc('settings/company').onSnapshot((d) => { S.company = d.exists ? { ...d.data() } : {}; schedule(); });
+  render();
+})();
+})();
+</script>
