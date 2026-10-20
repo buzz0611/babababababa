@@ -1,0 +1,674 @@
+<title>スクラップ荷姿照合</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=IBM+Plex+Mono:wght@400;600&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
+<style>
+/* Layout: 検収台の作業画面。左に入荷写真、右に判定と過去実績、下に実績ライブラリ */
+:root {
+  --bg: #e9ecee;
+  --surface: #f7f8f9;
+  --sunken: #dde2e5;
+  --ink: #1a2024;
+  --muted: #5a6670;
+  --line: #c7ced3;
+  --accent: #1d5aa6;
+  --accent-ink: #ffffff;
+  --rare: #9a4a06;
+  --rare-bg: #fbe9c8;
+  --rare-line: #e2b25f;
+  --ok: #24724a;
+  --ok-bg: #d8efe1;
+  --mid: #5b5f9e;
+  --mid-bg: #e2e3f3;
+  --bad: #a8261b;
+  --bad-bg: #f6dcd8;
+  --bar: #1d5aa6;
+  --font-display: "Dela Gothic One", "Zen Kaku Gothic New", "Hiragino Sans", sans-serif;
+  --font-body: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic", "Noto Sans JP", sans-serif;
+  --font-data: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121619; --surface: #1a2025; --sunken: #0e1215; --ink: #e4e9ec; --muted: #94a2ac; --line: #2c353c;
+    --accent: #6fa3e6; --accent-ink: #0d1a2b; --rare: #f2b14a; --rare-bg: #33240c; --rare-line: #7a5419;
+    --ok: #6cc896; --ok-bg: #12301f; --mid: #a9acf0; --mid-bg: #23244a; --bad: #f08a7e; --bad-bg: #3a1714; --bar: #6fa3e6;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #121619; --surface: #1a2025; --sunken: #0e1215; --ink: #e4e9ec; --muted: #94a2ac; --line: #2c353c;
+  --accent: #6fa3e6; --accent-ink: #0d1a2b; --rare: #f2b14a; --rare-bg: #33240c; --rare-line: #7a5419;
+  --ok: #6cc896; --ok-bg: #12301f; --mid: #a9acf0; --mid-bg: #23244a; --bad: #f08a7e; --bad-bg: #3a1714; --bar: #6fa3e6;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 48px;
+}
+.wrap { max-width: 1180px; margin: 0 auto; display: grid; gap: 20px; }
+header { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 8px 20px; border-bottom: 2px solid var(--ink); padding-bottom: 12px; }
+h1 { font-family: var(--font-display); font-weight: 400; font-size: clamp(24px, 4vw, 34px); margin: 0; line-height: 1.15; letter-spacing: .02em; text-wrap: balance; }
+.lede { margin: 4px 0 0; color: var(--muted); max-width: 62ch; }
+.tag { font-family: var(--font-data); font-size: 12px; letter-spacing: .06em; border: 1px dashed var(--muted); color: var(--muted); padding: 3px 8px; border-radius: 3px; white-space: nowrap; }
+h2 { font-size: 13px; letter-spacing: .14em; margin: 0; color: var(--muted); font-weight: 700; }
+.grid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 20px; align-items: start; }
+@media (max-width: 860px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 16px; display: grid; gap: 14px; min-width: 0; }
+.photo { position: relative; aspect-ratio: 4 / 3; max-width: 100%; background: var(--sunken); border-radius: 4px; overflow: hidden; display: grid; place-items: center; }
+.photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.photo .stamp { position: absolute; left: 8px; top: 8px; font-family: var(--font-data); font-size: 11px; background: rgba(0,0,0,.62); color: #fff; padding: 2px 7px; border-radius: 2px; }
+.drop { border: 1.5px dashed var(--line); border-radius: 4px; padding: 14px; text-align: center; color: var(--muted); cursor: pointer; transition: border-color .15s, background .15s; }
+.drop:hover, .drop.over, .drop:focus-within { border-color: var(--accent); background: var(--sunken); }
+.drop strong { color: var(--ink); }
+.drop input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+select, input[type="text"], button { font: inherit; font-size: 14px; }
+select, input[type="text"] { background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 4px; padding: 7px 9px; min-width: 0; }
+button { cursor: pointer; border-radius: 4px; padding: 7px 14px; border: 1px solid var(--accent); background: var(--accent); color: var(--accent-ink); font-weight: 700; }
+button.ghost { background: transparent; color: var(--accent); }
+button:focus-visible, select:focus-visible, input:focus-visible, .drop:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.hint { font-size: 12.5px; color: var(--muted); margin: 0; }
+.answer { font-size: 12.5px; color: var(--muted); font-family: var(--font-data); }
+
+/* 判定 */
+.verdict { display: grid; gap: 10px; }
+.verdict-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; }
+.verdict-name { font-family: var(--font-display); font-weight: 400; font-size: clamp(22px, 3.2vw, 28px); line-height: 1.2; }
+.grade { font-family: var(--font-data); font-size: 13px; color: var(--muted); }
+.conf { margin-left: auto; font-family: var(--font-data); font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.conf b { font-size: 22px; color: var(--ink); }
+.chip { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 700; letter-spacing: .04em; padding: 2px 9px; border-radius: 999px; white-space: nowrap; border: 1px solid transparent; }
+.chip.rare { background: var(--rare-bg); color: var(--rare); border-color: var(--rare-line); }
+.chip.mid { background: var(--mid-bg); color: var(--mid); }
+.chip.reg { background: var(--ok-bg); color: var(--ok); }
+.chip.none { background: var(--sunken); color: var(--muted); }
+.res-ok { color: var(--ok); } .res-cut { color: var(--rare); } .res-bad { color: var(--bad); }
+.callout { border: 1px solid var(--line); border-left-width: 4px; border-radius: 4px; padding: 12px 14px; display: grid; gap: 6px; background: var(--bg); }
+.callout.rare { border-color: var(--rare-line); background: var(--rare-bg); }
+.callout.rare .callout-title { color: var(--rare); }
+.callout-title { font-weight: 700; }
+.callout ul { margin: 0; padding-left: 1.2em; }
+.facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+@media (max-width: 520px) { .facts { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+.fact { display: grid; gap: 0; }
+.fact span { font-size: 11.5px; color: var(--muted); letter-spacing: .06em; }
+.fact b { font-family: var(--font-data); font-weight: 600; font-variant-numeric: tabular-nums; font-size: 15px; overflow-wrap: anywhere; }
+.scores { display: grid; gap: 6px; }
+.score { display: grid; grid-template-columns: 7.5em minmax(0, 1fr) 3.2em; gap: 10px; align-items: center; font-size: 13px; }
+.score .track { height: 8px; background: var(--sunken); border-radius: 4px; overflow: hidden; }
+.score .fill { display: block; height: 100%; background: var(--bar); border-radius: 4px; }
+.score .num { font-family: var(--font-data); text-align: right; font-variant-numeric: tabular-nums; }
+.cands { display: grid; gap: 4px; }
+.cands .score { grid-template-columns: 11em minmax(0, 1fr) 3.2em; }
+
+.matches { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.match { display: grid; gap: 4px; font-size: 12.5px; min-width: 0; }
+.match img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 3px; display: block; }
+.match .sim { font-family: var(--font-data); font-weight: 600; font-variant-numeric: tabular-nums; }
+.match .meta { color: var(--muted); overflow-wrap: anywhere; }
+.match-top { display: flex; justify-content: space-between; gap: 6px; align-items: baseline; }
+
+.reg-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.reg-form label { display: grid; gap: 3px; font-size: 12px; color: var(--muted); min-width: 0; }
+.reg-form .full { grid-column: 1 / -1; }
+@media (max-width: 520px) { .reg-form { grid-template-columns: minmax(0, 1fr); } }
+.toast { font-size: 13px; color: var(--ok); min-height: 1.4em; margin: 0; }
+
+/* ライブラリ */
+.lib-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+.seg button { border: 0; border-radius: 0; background: transparent; color: var(--muted); font-weight: 500; padding: 5px 12px; }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+.lib { display: grid; gap: 0; }
+.lib-row { display: grid; grid-template-columns: minmax(0, 15em) minmax(0, 11em) minmax(0, 1fr); gap: 14px; align-items: center; padding: 12px 0; border-top: 1px solid var(--line); }
+@media (max-width: 760px) { .lib-row { grid-template-columns: minmax(0, 1fr); gap: 6px; } }
+.lib-name { font-weight: 700; }
+.lib-name small { display: block; font-weight: 400; color: var(--muted); font-family: var(--font-data); font-size: 12px; }
+.lib-stat { font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.lib-stat b { color: var(--ink); font-family: var(--font-data); }
+.thumbs { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
+.thumb { position: relative; flex: 0 0 auto; width: 84px; }
+.thumb img { width: 84px; height: 63px; object-fit: cover; border-radius: 3px; display: block; }
+.thumb span { display: block; font-family: var(--font-data); font-size: 10.5px; color: var(--muted); }
+.thumb .del { position: absolute; right: 2px; top: 2px; padding: 0 6px; font-size: 11px; line-height: 18px; background: rgba(0,0,0,.65); border: 0; color: #fff; }
+.thumb.mine img { outline: 2px solid var(--accent); outline-offset: -2px; }
+footer { font-size: 12.5px; color: var(--muted); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>スクラップ荷姿照合</h1>
+      <p class="lede">入荷した鉄スクラップの写真を過去の検収実績と照らし合わせ、品目の候補と、たまにしか来ない荷物かどうかを判定します。</p>
+    </div>
+    <span class="tag">過去実績はサンプル</span>
+  </header>
+
+  <div class="grid">
+    <section class="panel" aria-labelledby="in-h">
+      <h2 id="in-h">入荷写真</h2>
+      <div class="photo" id="photo"><span class="hint">写真を選ぶと表示されます</span></div>
+      <label class="drop" id="drop">
+        <input type="file" id="file" accept="image/*" capture="environment">
+        <strong>写真を選ぶ</strong>（またはここにドラッグ）<br>
+        <span class="hint">荷台やヤードの荷姿全体が写っている写真が向いています</span>
+      </label>
+      <div class="row">
+        <select id="test-cat" aria-label="テスト入荷の品目"></select>
+        <button type="button" class="ghost" id="test-btn">テスト入荷を生成して照合</button>
+      </div>
+      <p class="answer" id="answer"></p>
+      <p class="hint">テスト入荷は、写真の代わりに品目ごとの荷姿を毎回少しずつ変えて描いた疑似写真です。実際の写真を登録していくと、その写真同士で照合されるようになります。</p>
+    </section>
+
+    <section class="panel" aria-labelledby="out-h" aria-live="polite">
+      <h2 id="out-h">判定</h2>
+      <div id="verdict" class="verdict"></div>
+    </section>
+  </div>
+
+  <section class="panel" aria-labelledby="reg-h">
+    <h2 id="reg-h">この入荷を過去実績に登録</h2>
+    <form class="reg-form" id="reg-form">
+      <label>品目<select id="reg-cat"></select></label>
+      <label>仕入先<input type="text" id="reg-supplier" placeholder="例：港北解体"></label>
+      <label>検収結果<select id="reg-result">
+        <option value="合格">合格</option>
+        <option value="減額">減額</option>
+        <option value="選別指示">選別指示</option>
+        <option value="返品">返品</option>
+      </select></label>
+      <label>メモ<input type="text" id="reg-memo" placeholder="例：溶断面に塗装あり"></label>
+      <div class="row full"><button type="submit" id="reg-btn">過去実績に登録</button><p class="toast" id="toast"></p></div>
+    </form>
+    <p class="hint">登録した実績はこのブラウザにだけ保存されます（他の人や端末とは共有されません）。</p>
+  </section>
+
+  <section class="panel" aria-labelledby="lib-h">
+    <div class="lib-head">
+      <h2 id="lib-h">過去実績ライブラリ</h2>
+      <div class="seg" role="group" aria-label="表示する品目">
+        <button type="button" id="f-all" aria-pressed="true">すべて</button>
+        <button type="button" id="f-rare" aria-pressed="false">たまにしか来ない品目</button>
+      </div>
+    </div>
+    <div class="lib" id="lib"></div>
+  </section>
+
+  <footer>入荷頻度の区分：直近12ヶ月の入荷が5回以下＝たまに来る品目、6〜23回＝時々、24回以上＝定常。単価・仕入先・実績はすべて架空のサンプルです。</footer>
+</div>
+
+<script>
+(() => {
+const W = 240, H = 180;
+const DAY = 86400000;
+const TODAY = new Date(); TODAY.setHours(0, 0, 0, 0);
+const STORE_KEY = 'scrap-match-records-v1';
+
+/* ---------- 品目マスタ（サンプル） ---------- */
+// extra12: 写真のない入荷実績（直近12ヶ月）の件数
+const CATS = [
+  { id: 'h2', name: 'ヘビー H2', grade: 'H2', price: 52000, extra12: 164,
+    notes: ['厚さ 3〜6mm 未満が主体か', '付着物・塗装の混入率', '長さ 1,200mm 以下か'] },
+  { id: 'shindan', name: '新断プレス', grade: '新断', price: 58500, extra12: 93,
+    notes: ['メッキ鋼板の混入', 'プレス寸法が規格内か'] },
+  { id: 'shred', name: 'シュレッダー', grade: 'SA', price: 54000, extra12: 138,
+    notes: ['銅線・樹脂の付着', '水濡れ（重量控除）'] },
+  { id: 'dalai', name: '鋼ダライ粉', grade: '鋼ダライ', price: 41000, extra12: 27,
+    notes: ['切削油の含有（油分控除）', '鋳物ダライとの混合'] },
+  { id: 'can', name: '缶プレス', grade: '缶プレス', price: 33000, extra12: 5,
+    notes: ['アルミ缶の混入率', '中身の残り・水分', '塗装による減額'] },
+  { id: 'hs', name: 'ヘビー HS（厚板・形鋼）', grade: 'HS', price: 57000, extra12: 0,
+    notes: ['厚さ 6mm 以上をノギスで実測', '溶断面に異材が付いていないか', 'H2 との単価差が大きいので荷姿写真を必ず残す'] },
+  { id: 'imono', name: '鋳物くず', grade: '銑くず', price: 55500, extra12: 0,
+    notes: ['ダクタイル鋳鉄とねずみ鋳鉄の区別', '砂・中子の付着', '磁石でステンレス鋳物の混入を確認'] },
+  { id: 'rail', name: 'レール切断材', grade: 'レール', price: 59000, extra12: 0,
+    notes: ['切断長さが炉に投入できる寸法か', '継目板・ボルトは別品目で計上', '由来と数量を送り状で確認'] },
+  { id: 'motor', name: 'モーター・トランス', grade: '雑品（要選別）', price: null, extra12: 0,
+    notes: ['銅巻線は分別して別単価', '絶縁油の漏れ（トランスは PCB 含有の有無を確認）', '鉄スクラップとして受け入れず選別指示'] },
+  { id: 'sus', name: 'ステンレス屑', grade: 'SUS（鉄扱い不可）', price: null, extra12: 0,
+    notes: ['磁石が付かなければ鉄扱い不可', '非鉄担当へ回して鋼種を判別', '仕入先に誤配の連絡'] },
+];
+const CAT = Object.fromEntries(CATS.map(c => [c.id, c]));
+
+// 写真付きの過去実績（サンプル）: [品目, 日付, 仕入先, 重量t, 結果, メモ]
+const SAMPLE = [
+  ['h2', '2026-10-17', '港北解体', 11.2, '合格', ''],
+  ['h2', '2026-10-09', '丸栄鉄工所', 8.6, '減額', '塗装付着が多め −1,000円/t'],
+  ['h2', '2026-09-28', '港北解体', 12.4, '合格', ''],
+  ['h2', '2026-09-11', '西部リサイクル', 9.8, '合格', ''],
+  ['shindan', '2026-10-16', '三協機工', 6.1, '合格', ''],
+  ['shindan', '2026-10-02', '三協機工', 5.8, '合格', ''],
+  ['shindan', '2026-09-19', '大和鋼材センター', 7.0, '減額', 'メッキ材混入 −1,500円/t'],
+  ['shred', '2026-10-18', '西部リサイクル', 13.5, '合格', ''],
+  ['shred', '2026-10-06', '西部リサイクル', 12.9, '減額', '銅付着 −2,000円/t'],
+  ['shred', '2026-09-24', '中央プレス', 14.1, '合格', ''],
+  ['shred', '2026-09-03', '西部リサイクル', 13.2, '合格', ''],
+  ['dalai', '2026-10-08', '東和精機', 3.2, '減額', '油分多め 重量 −3%'],
+  ['dalai', '2026-09-15', '東和精機', 2.9, '合格', ''],
+  ['dalai', '2026-08-27', '大和鋼材センター', 3.5, '合格', ''],
+  ['can', '2026-09-30', 'みどり資源回収', 2.4, '減額', 'アルミ缶混入 −3,000円/t'],
+  ['can', '2026-06-08', 'みどり資源回収', 2.1, '合格', ''],
+  ['can', '2026-01-15', 'みどり資源回収', 2.6, '合格', ''],
+  ['hs', '2026-07-03', '臨海造船解体', 18.4, '合格', '厚板 9〜22mm、実測済み'],
+  ['hs', '2026-02-18', '港北解体', 10.6, '減額', '一部 H2 相当 → 2割を H2 で計上'],
+  ['hs', '2025-12-09', '臨海造船解体', 21.0, '合格', ''],
+  ['imono', '2026-05-21', '丸栄鉄工所', 4.4, '合格', 'ねずみ鋳鉄。中子砂わずか'],
+  ['imono', '2025-11-12', '東和精機', 3.1, '減額', '砂付着 −2,500円/t'],
+  ['imono', '2025-03-04', '丸栄鉄工所', 5.0, '合格', ''],
+  ['rail', '2025-06-17', '臨海軌道保線', 16.2, '合格', '定尺 1.2m に切断済み。継目板は別計上'],
+  ['rail', '2023-09-30', '臨海軌道保線', 14.8, '合格', ''],
+  ['motor', '2026-08-26', '中央プレス', 1.8, '選別指示', '銅巻線付き。トランス 2 台は油抜き確認後に受入'],
+  ['motor', '2025-10-02', '西部リサイクル', 2.3, '選別指示', ''],
+  ['sus', '2026-03-11', '大和鋼材センター', 1.2, '返品', 'SUS304 の端材が誤配。磁石で判別'],
+];
+
+/* ---------- 疑似写真の描画 ---------- */
+function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const hsl = (h, s, l, a = 1) => `hsla(${h},${s}%,${l}%,${a})`;
+function rotRect(ctx, x, y, w, h, ang) { ctx.save(); ctx.translate(x, y); ctx.rotate(ang); ctx.beginPath(); ctx.rect(-w / 2, -h / 2, w, h); ctx.restore(); }
+function blob(ctx, x, y, r, n, R) {
+  ctx.beginPath();
+  for (let k = 0; k < n; k++) {
+    const a = k / n * Math.PI * 2 + R() * 0.5, rr = r * (0.6 + R() * 0.6);
+    const px = x + Math.cos(a) * rr, py = y + Math.sin(a) * rr;
+    k ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+  }
+  ctx.closePath();
+}
+function ground(ctx, l) {
+  const g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, hsl(35, 8, l + 8)); g.addColorStop(1, hsl(30, 10, l - 6));
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+}
+function cubes(ctx, R, size, paint) {
+  for (let y = -6; y < H; y += size * 0.82)
+    for (let x = -12 + R() * 10; x < W; x += size * (0.95 + R() * 0.1)) {
+      const w = size * (0.9 + R() * 0.15), h = size * 0.8 * (0.9 + R() * 0.15);
+      paint(x, y, w, h);
+      ctx.strokeStyle = 'rgba(0,0,0,.5)'; ctx.lineWidth = 1.5; ctx.strokeRect(x, y, w, h);
+    }
+}
+const DRAW = {
+  h2(ctx, R) {
+    ground(ctx, 38);
+    for (let i = 0; i < 75; i++) {
+      rotRect(ctx, R() * W, H * 0.1 + R() * H * 0.95, 18 + R() * 50, 5 + R() * 14, R() * Math.PI);
+      ctx.fillStyle = R() < 0.15 ? hsl(30, 6, 35 + R() * 15) : hsl(12 + R() * 18, 30 + R() * 30, 20 + R() * 22);
+      ctx.fill(); ctx.strokeStyle = 'rgba(0,0,0,.45)'; ctx.lineWidth = 1; ctx.stroke();
+    }
+  },
+  shindan(ctx, R) {
+    ground(ctx, 34);
+    cubes(ctx, R, 36 + R() * 8, (x, y, w, h) => {
+      const l = 52 + R() * 20;
+      ctx.fillStyle = hsl(210, 5, l); ctx.fillRect(x, y, w, h);
+      for (let k = 0; k < 7; k++) {
+        const yy = y + R() * h;
+        ctx.strokeStyle = hsl(210, 6, l + (R() < 0.5 ? -14 : 12)); ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(x, yy); ctx.lineTo(x + w, yy + (R() - 0.5) * 3); ctx.stroke();
+      }
+    });
+  },
+  shred(ctx, R) {
+    ground(ctx, 26);
+    for (let i = 0; i < 1500; i++) {
+      const p = R();
+      blob(ctx, R() * W, R() * H, 1.5 + R() * 4, 5, R);
+      ctx.fillStyle = p < 0.6 ? hsl(20, 20 + R() * 20, 18 + R() * 22) : p < 0.9 ? hsl(210, 5, 35 + R() * 25) : hsl(R() * 360, 35, 45);
+      ctx.fill();
+    }
+  },
+  dalai(ctx, R) {
+    ctx.fillStyle = hsl(210, 8, 24); ctx.fillRect(0, 0, W, H);
+    for (let i = 0; i < 150; i++) {
+      const cx = R() * W, cy = R() * H, turns = 2 + R() * 2.5, rmax = 5 + R() * 12, sq = 0.4 + R() * 0.6, rot = R() * Math.PI;
+      const end = turns * Math.PI * 2, c = Math.cos(rot), s = Math.sin(rot);
+      ctx.strokeStyle = hsl(195 + R() * 25, 10 + R() * 18, 50 + R() * 35); ctx.lineWidth = 0.8 + R() * 1.2;
+      ctx.beginPath();
+      for (let t = 0; t <= end; t += 0.25) {
+        const r = rmax * t / end, px = r * Math.cos(t), py = r * Math.sin(t) * sq;
+        const X = cx + px * c - py * s, Y = cy + px * s + py * c;
+        t ? ctx.lineTo(X, Y) : ctx.moveTo(X, Y);
+      }
+      ctx.stroke();
+    }
+  },
+  can(ctx, R) {
+    ground(ctx, 36);
+    const pal = [hsl(0, 70, 45), hsl(215, 65, 40), hsl(48, 85, 55), hsl(0, 0, 88), hsl(140, 45, 35), hsl(210, 6, 70)];
+    const pick = () => pal[Math.floor(R() * pal.length)];
+    cubes(ctx, R, 28 + R() * 6, (x, y, w, h) => {
+      ctx.fillStyle = pick(); ctx.fillRect(x, y, w, h);
+      for (let k = 0; k < 14; k++) { ctx.fillStyle = pick(); ctx.fillRect(x + R() * w * 0.85, y + R() * h * 0.85, 3 + R() * 6, 2 + R() * 4); }
+    });
+  },
+  hs(ctx, R) {
+    ground(ctx, 40);
+    for (let i = 0; i < 15; i++) {
+      const x = R() * W, y = R() * H, len = 90 + R() * 120, h = 16 + R() * 18, ang = (R() - 0.5) * 1.3, l = 16 + R() * 12;
+      rotRect(ctx, x, y, len, h, ang);
+      ctx.fillStyle = hsl(15 + R() * 10, 35 + R() * 15, l); ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,.7)'; ctx.lineWidth = 2; ctx.stroke();
+      ctx.save(); ctx.translate(x, y); ctx.rotate(ang);
+      ctx.strokeStyle = hsl(15, 30, l - 8); ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(-len / 2, -h * 0.25); ctx.lineTo(len / 2, -h * 0.25); ctx.moveTo(-len / 2, h * 0.25); ctx.lineTo(len / 2, h * 0.25); ctx.stroke();
+      ctx.strokeStyle = hsl(20, 25, l + 14); ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(-len / 2, -h / 2 + 1); ctx.lineTo(len / 2, -h / 2 + 1); ctx.stroke();
+      ctx.restore();
+    }
+  },
+  imono(ctx, R) {
+    ground(ctx, 30);
+    for (let i = 0; i < 85; i++) {
+      blob(ctx, R() * W, R() * H, 8 + R() * 18, 7, R);
+      ctx.fillStyle = hsl(220, 4, 12 + R() * 16); ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,.5)'; ctx.lineWidth = 1; ctx.stroke();
+    }
+    for (let i = 0; i < 1800; i++) { ctx.fillStyle = hsl(0, 0, 55 + R() * 20, 0.35); ctx.fillRect(R() * W, R() * H, 1, 1); }
+  },
+  rail(ctx, R) {
+    ground(ctx, 42);
+    ctx.save(); ctx.translate(W / 2, H / 2); ctx.rotate((R() - 0.5) * 0.6);
+    let oy = -H * 0.75;
+    for (let k = 0; k < 14; k++) {
+      const h = 11 + R() * 4, x0 = -W * 0.9 + R() * 30, len = W * 1.8;
+      ctx.fillStyle = hsl(16 + R() * 6, 40 + R() * 10, 26 + R() * 10); ctx.fillRect(x0, oy, len, h);
+      ctx.fillStyle = hsl(25, 10, 55 + R() * 12); ctx.fillRect(x0, oy, len, h * 0.3);
+      ctx.strokeStyle = 'rgba(0,0,0,.6)'; ctx.lineWidth = 1; ctx.strokeRect(x0, oy, len, h);
+      oy += h + 3 + R() * 6;
+    }
+    ctx.restore();
+  },
+  motor(ctx, R) {
+    ground(ctx, 30);
+    for (let i = 0; i < 450; i++) {
+      blob(ctx, R() * W, R() * H, 2 + R() * 4, 5, R);
+      ctx.fillStyle = R() < 0.6 ? hsl(20, 25, 20 + R() * 20) : hsl(210, 5, 35 + R() * 20); ctx.fill();
+    }
+    for (let i = 0; i < 17; i++) {
+      const x = R() * W, y = R() * H, r = 15 + R() * 15, rot = R() * Math.PI, sq = 0.7 + R() * 0.3;
+      ctx.beginPath(); ctx.ellipse(x, y, r, r * sq, rot, 0, Math.PI * 2);
+      ctx.fillStyle = hsl(210, 8, 30 + R() * 18); ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,.6)'; ctx.lineWidth = 1.5; ctx.stroke();
+      for (let k = 0; k < 5; k++) {
+        const rr = r * (0.35 + k * 0.11);
+        ctx.beginPath(); ctx.ellipse(x, y, rr, rr * sq * 0.9, rot, 0, Math.PI * 2);
+        ctx.strokeStyle = hsl(22 + R() * 8, 70, 40 + R() * 15); ctx.lineWidth = 2.4; ctx.stroke();
+      }
+    }
+  },
+  sus(ctx, R) {
+    ground(ctx, 56);
+    for (let i = 0; i < 60; i++) {
+      const x = R() * W, y = R() * H, w = 20 + R() * 40, h = 6 + R() * 12;
+      rotRect(ctx, x, y, w, h, R() * Math.PI);
+      const g = ctx.createLinearGradient(x - w / 2, y - h, x + w / 2, y + h);
+      g.addColorStop(0, hsl(210, 8, 66)); g.addColorStop(0.5, hsl(210, 12, 92)); g.addColorStop(1, hsl(210, 6, 70));
+      ctx.fillStyle = g; ctx.fill(); ctx.strokeStyle = 'rgba(0,0,0,.25)'; ctx.lineWidth = 1; ctx.stroke();
+    }
+  },
+};
+// 露出・色かぶり・ノイズ・周辺減光で撮影条件のばらつきを再現
+function finish(ctx, R) {
+  const im = ctx.getImageData(0, 0, W, H), d = im.data;
+  const exp = 0.85 + R() * 0.3, warm = (R() - 0.5) * 18;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const i = (y * W + x) * 4, n = (R() - 0.5) * 26;
+    const dx = (x - W / 2) / (W / 2), dy = (y - H / 2) / (H / 2), v = 1 - 0.18 * (dx * dx + dy * dy);
+    d[i] = (d[i] * exp + n + warm) * v; d[i + 1] = (d[i + 1] * exp + n) * v; d[i + 2] = (d[i + 2] * exp + n - warm) * v;
+  }
+  ctx.putImageData(im, 0, 0);
+}
+function synth(catId, seed) {
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  DRAW[catId](ctx, mulberry32(seed));
+  finish(ctx, mulberry32(seed ^ 0x9e3779b9));
+  return c;
+}
+
+/* ---------- 特徴量（色・エッジ方向・粒度） ---------- */
+const FW = 128, FH = 96;
+function sobel(g, w, h) {
+  const hist = new Float64Array(8); let sum = 0;
+  for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
+    const i = y * w + x;
+    const gx = g[i - w + 1] + 2 * g[i + 1] + g[i + w + 1] - g[i - w - 1] - 2 * g[i - 1] - g[i + w - 1];
+    const gy = g[i + w - 1] + 2 * g[i + w] + g[i + w + 1] - g[i - w - 1] - 2 * g[i - w] - g[i - w + 1];
+    const m = Math.hypot(gx, gy); sum += m;
+    if (m > 40) { let a = Math.atan2(gy, gx); if (a < 0) a += Math.PI; hist[Math.min(7, Math.floor(a / Math.PI * 8))] += m; }
+  }
+  return { mean: sum / ((w - 2) * (h - 2)), hist };
+}
+const norm = a => { const s = a.reduce((p, v) => p + v, 0) || 1; return Array.from(a, v => v / s); };
+function features(src, sw, sh) {
+  const c = document.createElement('canvas'); c.width = FW; c.height = FH;
+  const x = c.getContext('2d', { willReadFrequently: true });
+  const ar = FW / FH; let cw = sw, ch = sw / ar; if (ch > sh) { ch = sh; cw = sh * ar; }
+  x.drawImage(src, (sw - cw) / 2, (sh - ch) / 2, cw, ch, 0, 0, FW, FH);
+  const d = x.getImageData(0, 0, FW, FH).data;
+  const color = new Float64Array(42), g = new Float64Array(FW * FH);
+  let sv = 0, sv2 = 0, ss = 0;
+  for (let p = 0; p < FW * FH; p++) {
+    const r = d[p * 4] / 255, gg = d[p * 4 + 1] / 255, b = d[p * 4 + 2] / 255;
+    const mx = Math.max(r, gg, b), mn = Math.min(r, gg, b), v = mx, s = mx ? (mx - mn) / mx : 0;
+    g[p] = (0.299 * r + 0.587 * gg + 0.114 * b) * 255;
+    sv += v; sv2 += v * v; ss += s;
+    if (s < 0.14 || v < 0.12) color[Math.min(5, Math.floor(v * 6))]++;
+    else {
+      let hue = mx === mn ? 0 : mx === r ? ((gg - b) / (mx - mn)) % 6 : mx === gg ? (b - r) / (mx - mn) + 2 : (r - gg) / (mx - mn) + 4;
+      hue = (hue * 60 + 360) % 360;
+      color[6 + Math.floor(hue / 30) % 12 * 3 + (v < 0.4 ? 0 : v < 0.7 ? 1 : 2)]++;
+    }
+  }
+  const n = FW * FH, half = new Float64Array(FW * FH / 4);
+  for (let y = 0; y < FH / 2; y++) for (let xx = 0; xx < FW / 2; xx++) {
+    const i = 2 * y * FW + 2 * xx;
+    half[y * FW / 2 + xx] = (g[i] + g[i + 1] + g[i + FW] + g[i + FW + 1]) / 4;
+  }
+  const e1 = sobel(g, FW, FH), e2 = sobel(half, FW / 2, FH / 2);
+  const o = norm(e1.hist), mv = sv / n;
+  return {
+    c: norm(color), o,
+    s: [mv, Math.sqrt(Math.max(0, sv2 / n - mv * mv)), ss / n, e1.mean, e2.mean, e1.mean / (e2.mean + 1), Math.max(...o)],
+  };
+}
+function chi(a, b) { let s = 0; for (let i = 0; i < a.length; i++) { const t = a[i] + b[i]; if (t > 0) s += (a[i] - b[i]) ** 2 / t; } return s / 2; }
+
+/* ---------- 実績データ ---------- */
+const recs = [];
+function loadMine() { try { return JSON.parse(localStorage.getItem(STORE_KEY) || '[]'); } catch { return []; } }
+function saveMine() { try { localStorage.setItem(STORE_KEY, JSON.stringify(recs.filter(r => r.mine))); return true; } catch { return false; } }
+SAMPLE.forEach(([cat, date, supplier, weight, result, memo], i) => {
+  const c = synth(cat, 1000 + i * 7919);
+  recs.push({ id: 's' + i, cat, date, supplier, weight, result, memo, img: c.toDataURL('image/jpeg', 0.82), f: features(c, W, H) });
+});
+loadMine().forEach(r => { if (CAT[r.cat] && r.f) recs.push({ ...r, mine: true }); });
+
+let sd = [];
+function refreshScale() {
+  const k = recs[0].f.s.length; sd = [];
+  for (let j = 0; j < k; j++) {
+    const vals = recs.map(r => r.f.s[j]), m = vals.reduce((a, b) => a + b, 0) / vals.length;
+    sd.push(Math.sqrt(vals.reduce((a, b) => a + (b - m) ** 2, 0) / vals.length) || 1);
+  }
+}
+function compare(a, b) {
+  const cc = chi(a.c, b.c), co = chi(a.o, b.o);
+  let t = 0; for (let j = 0; j < a.s.length; j++) t += Math.min(1, Math.abs(a.s[j] - b.s[j]) / (2 * sd[j]));
+  t /= a.s.length;
+  const d = 0.45 * cc + 0.2 * co + 0.35 * t;
+  return { d, sim: Math.exp(-d / 0.2), color: 1 - cc, shape: 1 - co, grain: 1 - t };
+}
+const daysAgo = s => Math.round((TODAY - new Date(s + 'T00:00:00')) / DAY);
+function catStats(id) {
+  const rs = recs.filter(r => r.cat === id).sort((a, b) => a.date < b.date ? 1 : -1);
+  const n12 = CAT[id].extra12 + rs.filter(r => daysAgo(r.date) <= 365).length;
+  const tier = n12 >= 24 ? 'reg' : n12 >= 6 ? 'mid' : 'rare';
+  return { rs, n12, tier, last: rs[0] };
+}
+const TIER_LABEL = { reg: '定常', mid: '時々', rare: 'たまに来る品目' };
+
+/* ---------- 表示 ---------- */
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]);
+const pct = v => Math.round(Math.max(0, Math.min(1, v)) * 100);
+const resClass = r => r === '合格' ? 'res-ok' : r === '返品' ? 'res-bad' : 'res-cut';
+const yen = p => p ? p.toLocaleString('ja-JP') + ' 円/t' : '鉄としては値付けなし';
+const fmtDays = n => n >= 365 ? `${(n / 365).toFixed(1)}年前` : `${n}日前`;
+
+let query = null; // { img, f, answer }
+
+function bar(label, v) {
+  return `<div class="score"><span>${esc(label)}</span><span class="track"><span class="fill" style="width:${pct(v)}%"></span></span><span class="num">${pct(v)}%</span></div>`;
+}
+
+function renderVerdict() {
+  const el = $('verdict');
+  if (!query) { el.innerHTML = '<p class="hint">写真を選ぶか、テスト入荷を生成すると判定が表示されます。</p>'; return; }
+  const scored = recs.map(r => ({ r, ...compare(query.f, r.f) })).sort((a, b) => b.sim - a.sim);
+  const top = scored.slice(0, 5);
+  const votes = {}; let total = 0;
+  top.forEach(s => { const w = s.sim ** 3; votes[s.r.cat] = (votes[s.r.cat] || 0) + w; total += w; });
+  const ranked = Object.entries(votes).sort((a, b) => b[1] - a[1]);
+  const best = scored[0];
+  const known = best.sim >= 0.25;
+  const catId = ranked[0][0], cat = CAT[catId], st = catStats(catId);
+  const conf = votes[catId] / total;
+  const nearest = scored.find(s => s.r.cat === catId);
+  $('reg-cat').value = known ? catId : $('reg-cat').value;
+
+  let html = '';
+  if (!known) {
+    html += `<div class="verdict-head"><span class="verdict-name">近い過去実績なし</span><span class="chip none">初めての荷姿の可能性</span></div>
+      <div class="callout"><span class="callout-title">登録済みの写真と似ていません</span>
+      <span>一番近いのは「${esc(cat.name)}」ですが、類似度 ${pct(best.sim)}% で判定の根拠になりません。品目を目視で確定してから、下の「過去実績に登録」で写真を残すと、次回から照合できるようになります。</span></div>`;
+  } else {
+    const last = st.last;
+    html += `<div class="verdict-head">
+        <span class="verdict-name">${esc(cat.name)}</span><span class="grade">${esc(cat.grade)}</span>
+        <span class="chip ${st.tier}">${TIER_LABEL[st.tier]}</span>
+        <span class="conf">確度 <b>${pct(conf)}</b>%</span></div>`;
+    const lastLine = last ? `前回 ${esc(last.date)}（${fmtDays(daysAgo(last.date))}）${esc(last.supplier)}：<span class="${resClass(last.result)}">${esc(last.result)}</span>${last.memo ? '／' + esc(last.memo) : ''}` : '写真付きの実績はまだありません';
+    html += `<div class="callout ${st.tier === 'rare' ? 'rare' : ''}">
+      <span class="callout-title">${st.tier === 'rare' ? 'たまにしか来ない荷物です。前回の検収内容を確認してください' : '検収ポイント'}</span>
+      ${st.tier === 'rare' ? `<span>${lastLine}</span>` : ''}
+      <ul>${cat.notes.map(n => `<li>${esc(n)}</li>`).join('')}</ul></div>`;
+    html += `<div class="facts">
+      <div class="fact"><span>直近12ヶ月の入荷</span><b>${st.n12} 回</b></div>
+      <div class="fact"><span>最終入荷</span><b>${last ? esc(last.date) : '—'}</b></div>
+      <div class="fact"><span>参考単価</span><b>${yen(cat.price)}</b></div></div>`;
+    html += `<div class="scores"><h2>最も近い実績との一致度</h2>${bar('色味', nearest.color)}${bar('形の向き', nearest.shape)}${bar('粒度・質感', nearest.grain)}</div>`;
+    if (ranked.length > 1) {
+      html += `<div class="cands"><h2>品目の候補</h2>${ranked.slice(0, 3).map(([id, v]) => bar(CAT[id].name, v / total)).join('')}</div>`;
+    }
+  }
+  html += `<h2>似ている過去の入荷</h2><div class="matches">${scored.slice(0, 6).map(s => `
+    <div class="match"><img src="${s.r.img}" alt="${esc(CAT[s.r.cat].name)}の過去写真">
+      <div class="match-top"><b>${esc(CAT[s.r.cat].name)}</b><span class="sim">${pct(s.sim)}%</span></div>
+      <span class="meta">${esc(s.r.date)}・${esc(s.r.supplier || '仕入先未入力')}・<span class="${resClass(s.r.result)}">${esc(s.r.result)}</span></span>
+    </div>`).join('')}</div>`;
+  el.innerHTML = html;
+}
+
+let filter = 'all';
+function renderLib() {
+  const rows = CATS.map(c => ({ c, st: catStats(c.id) }))
+    .filter(x => filter === 'all' || x.st.tier === 'rare')
+    .sort((a, b) => a.st.n12 - b.st.n12);
+  $('lib').innerHTML = rows.map(({ c, st }) => `
+    <div class="lib-row">
+      <div class="lib-name">${esc(c.name)} <span class="chip ${st.tier}">${TIER_LABEL[st.tier]}</span><small>${esc(c.grade)}</small></div>
+      <div class="lib-stat">12ヶ月 <b>${st.n12}</b> 回<br>最終 <b>${st.last ? esc(st.last.date) : '—'}</b>${st.last ? `（${fmtDays(daysAgo(st.last.date))}）` : ''}</div>
+      <div class="thumbs">${st.rs.map(r => `
+        <div class="thumb${r.mine ? ' mine' : ''}"><img src="${r.img}" alt="${esc(c.name)} ${esc(r.date)}" title="${esc(r.supplier)} ${esc(r.result)} ${esc(r.memo)}">
+          <span>${esc(r.date.slice(2))}${r.mine ? ' 登録' : ''}</span>
+          ${r.mine ? `<button type="button" class="del" data-del="${esc(r.id)}" aria-label="${esc(r.date)}の登録を削除">×</button>` : ''}</div>`).join('')}</div>
+    </div>`).join('') || '<p class="hint">該当する品目はありません。</p>';
+}
+
+function setQuery(img, f, answer, stamp) {
+  query = { img, f, answer };
+  $('photo').innerHTML = `<img src="${img}" alt="照合中の入荷写真"><span class="stamp">${esc(stamp)}</span>`;
+  $('answer').textContent = answer ? `テスト用の正解：${CAT[answer].name}` : '';
+  $('toast').textContent = '';
+  renderVerdict();
+}
+function runTest(catId) {
+  const id = catId === 'random' ? CATS[Math.floor(Math.random() * CATS.length)].id : catId;
+  const c = synth(id, (Math.random() * 2 ** 31) | 0);
+  setQuery(c.toDataURL('image/jpeg', 0.85), features(c, W, H), id, 'テスト入荷');
+}
+function loadFile(file) {
+  if (!file || !file.type.startsWith('image/')) { $('toast').textContent = '画像ファイルを選んでください。'; return; }
+  const url = URL.createObjectURL(file), im = new Image();
+  im.onload = () => {
+    const t = document.createElement('canvas'), ar = 4 / 3;
+    let cw = im.naturalWidth, ch = cw / ar; if (ch > im.naturalHeight) { ch = im.naturalHeight; cw = ch * ar; }
+    t.width = 320; t.height = 240;
+    t.getContext('2d').drawImage(im, (im.naturalWidth - cw) / 2, (im.naturalHeight - ch) / 2, cw, ch, 0, 0, 320, 240);
+    URL.revokeObjectURL(url);
+    setQuery(t.toDataURL('image/jpeg', 0.8), features(t, 320, 240), null, file.name.slice(0, 28));
+  };
+  im.onerror = () => { $('toast').textContent = 'この画像は読み込めませんでした。JPEG か PNG で試してください。'; };
+  im.src = url;
+}
+
+/* ---------- 操作 ---------- */
+$('test-cat').innerHTML = `<option value="random">品目をランダムに</option>` + CATS.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
+$('reg-cat').innerHTML = CATS.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
+$('test-btn').addEventListener('click', () => runTest($('test-cat').value));
+$('file').addEventListener('change', e => loadFile(e.target.files[0]));
+const drop = $('drop');
+['dragenter', 'dragover'].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.add('over'); }));
+['dragleave', 'drop'].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.remove('over'); }));
+drop.addEventListener('drop', e => loadFile(e.dataTransfer.files[0]));
+$('reg-form').addEventListener('submit', e => {
+  e.preventDefault();
+  if (!query) { $('toast').textContent = '先に写真を選ぶか、テスト入荷を生成してください。'; return; }
+  const d = TODAY, date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const cat = $('reg-cat').value;
+  recs.push({ id: 'u' + Date.now(), mine: true, cat, date, supplier: $('reg-supplier').value.trim(), weight: null,
+    result: $('reg-result').value, memo: $('reg-memo').value.trim(), img: query.img, f: query.f });
+  const saved = saveMine();
+  refreshScale(); renderLib(); renderVerdict();
+  $('toast').textContent = saved ? `「${CAT[cat].name}」の実績として登録しました。` : '登録しましたが、このブラウザでは保存できないため再読み込みで消えます。';
+});
+$('lib').addEventListener('click', e => {
+  const id = e.target.closest('[data-del]')?.dataset.del; if (!id) return;
+  const i = recs.findIndex(r => r.id === id && r.mine); if (i < 0) return;
+  recs.splice(i, 1); saveMine(); refreshScale(); renderLib(); if (query) renderVerdict();
+});
+[['f-all', 'all'], ['f-rare', 'rare']].forEach(([id, v]) => $(id).addEventListener('click', () => {
+  filter = v; $('f-all').setAttribute('aria-pressed', v === 'all'); $('f-rare').setAttribute('aria-pressed', v === 'rare'); renderLib();
+}));
+
+refreshScale();
+renderLib();
+// 開いた時点で、たまにしか来ない品目（HS）のテスト入荷を照合した状態にしておく
+$('test-cat').value = 'hs';
+const first = synth('hs', 424242);
+setQuery(first.toDataURL('image/jpeg', 0.85), features(first, W, H), 'hs', 'テスト入荷');
+
+window.__scrapEval = (n = 8) => {
+  const out = {}; let ok = 0, all = 0;
+  CATS.forEach(c => {
+    const sims = []; let hit = 0;
+    for (let k = 0; k < n; k++) {
+      const im = synth(c.id, 777 + k * 131), f = features(im, W, H);
+      const sc = recs.map(r => ({ r, ...compare(f, r.f) })).sort((a, b) => b.sim - a.sim);
+      const v = {}; sc.slice(0, 5).forEach(s => v[s.r.cat] = (v[s.r.cat] || 0) + s.sim ** 3);
+      const p = Object.entries(v).sort((a, b) => b[1] - a[1])[0][0];
+      if (p === c.id) hit++; sims.push(+sc[0].sim.toFixed(2));
+    }
+    ok += hit; all += n; out[c.id] = { hit, minTopSim: Math.min(...sims) };
+  });
+  return { acc: ok / all, out };
+};
+})();
+</script>
